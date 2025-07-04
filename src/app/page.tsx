@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import React, { useState, useEffect } from 'react'
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -12,16 +13,53 @@ import {
 } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Check, Shield } from 'lucide-react'
+import { Shield, Loader2 } from 'lucide-react'
+import { auth } from '@/lib/firebase'
+import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth'
+import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
   const router = useRouter()
+  const { toast } = useToast()
+  const [email, setEmail] = useState("admin@somasteel.com")
+  const [password, setPassword] = useState("password")
+  const [loading, setLoading] = useState(false)
+  const [checkingAuth, setCheckingAuth] = useState(true);
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        router.replace('/dashboard');
+      } else {
+        setCheckingAuth(false);
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
-    // In a real app, you'd have authentication logic here.
-    // For this prototype, we'll just navigate to the dashboard.
-    router.push('/dashboard')
+    setLoading(true)
+    try {
+      await signInWithEmailAndPassword(auth, email, password)
+      // The onAuthStateChanged listener will handle the redirect
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur de connexion",
+        description: "L'adresse e-mail ou le mot de passe est incorrect.",
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (checkingAuth) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </main>
+    )
   }
 
   return (
@@ -41,15 +79,16 @@ export default function LoginPage() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email / البريد الإلكتروني</Label>
-              <Input id="email" type="email" placeholder="m@example.com" required defaultValue="admin@somasteel.com" />
+              <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Mot de passe / كلمة المرور</Label>
-              <Input id="password" type="password" required defaultValue="password" />
+              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full bg-accent hover:bg-accent/90">
+            <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={loading}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Se connecter / تسجيل الدخول
             </Button>
             <p className="text-xs text-muted-foreground text-center">

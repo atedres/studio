@@ -5,12 +5,17 @@ import {
   AlertTriangle,
   ClipboardCheck,
   LayoutDashboard,
+  Loader2,
   Settings,
   Shield,
   Users,
   Wrench,
 } from "lucide-react"
+import { usePathname, useRouter } from 'next/navigation'
+import React, { useEffect } from 'react'
 
+import { AuthProvider, useAuth } from '@/hooks/use-auth'
+import { LanguageSwitcher } from "@/components/language-switcher"
 import {
   Sidebar,
   SidebarContent,
@@ -21,10 +26,9 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { LanguageSwitcher } from "@/components/language-switcher"
-import { UserNav } from "@/components/user-nav"
-import { usePathname } from 'next/navigation'
 import { ThemeSwitcher } from "@/components/theme-switcher"
+import { UserNav } from "@/components/user-nav"
+
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
@@ -35,12 +39,28 @@ const navItems = [
   { href: "/dashboard/settings", icon: Settings, label: "Paramètres" },
 ]
 
-export default function DashboardLayout({
+function ProtectedDashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { user, loading } = useAuth()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/')
+    }
+  }, [user, loading, router])
+
+  if (loading || !user) {
+    return (
+      <div className="flex min-h-screen w-full items-center justify-center">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    )
+  }
 
   const NavContent = () => (
     <>
@@ -93,5 +113,17 @@ export default function DashboardLayout({
         </div>
       </div>
     </SidebarProvider>
+  )
+}
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <AuthProvider>
+      <ProtectedDashboardLayout>{children}</ProtectedDashboardLayout>
+    </AuthProvider>
   )
 }

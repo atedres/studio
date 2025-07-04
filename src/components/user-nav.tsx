@@ -1,6 +1,6 @@
 "use client"
 
-import Link from "next/link"
+import { useAuth } from "@/hooks/use-auth"
 import {
   Avatar,
   AvatarFallback,
@@ -19,22 +19,34 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 export function UserNav() {
+  const { user, signOut } = useAuth()
+
+  if (!user) {
+    return null
+  }
+
+  const getInitials = (email: string | null) => {
+    if (!email) return "AD"
+    const name = email.split('@')[0]
+    return name.slice(0, 2).toUpperCase()
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
             <AvatarImage src="https://placehold.co/100x100.png" alt="@shadcn" data-ai-hint="user avatar" />
-            <AvatarFallback>AD</AvatarFallback>
+            <AvatarFallback>{getInitials(user.email)}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">Admin</p>
+            <p className="text-sm font-medium leading-none">{user.displayName || 'Admin'}</p>
             <p className="text-xs leading-none text-muted-foreground">
-              admin@somasteel.com
+              {user.email}
             </p>
           </div>
         </DropdownMenuLabel>
@@ -54,10 +66,8 @@ export function UserNav() {
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/">
-            Se déconnecter
-          </Link>
+        <DropdownMenuItem onClick={signOut}>
+          Se déconnecter
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
