@@ -9,7 +9,6 @@ import {
   Shield,
   Users,
   Wrench,
-  Menu,
 } from "lucide-react"
 
 import {
@@ -20,10 +19,8 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarProvider,
-  SidebarInset,
+  SidebarTrigger,
 } from "@/components/ui/sidebar"
-import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { UserNav } from "@/components/user-nav"
 import { usePathname } from 'next/navigation'
@@ -76,26 +73,14 @@ export default function DashboardLayout({
   )
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={false}>
       <div className="flex min-h-screen w-full">
-        <Sidebar className="hidden lg:flex lg:flex-col">
+        <Sidebar collapsible="offcanvas">
           <NavContent />
         </Sidebar>
         <div className="flex flex-1 flex-col">
           <header className="sticky top-0 z-10 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
-             <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="icon" className="shrink-0 lg:hidden">
-                    <Menu className="h-5 w-5" />
-                    <span className="sr-only">Toggle navigation menu</span>
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="flex flex-col p-0">
-                  <Sidebar>
-                    <NavContent />
-                  </Sidebar>
-                </SheetContent>
-              </Sheet>
+            <SidebarTrigger />
             <div className="w-full flex-1">
               {/* Optional: Add breadcrumbs or page title here */}
             </div>
