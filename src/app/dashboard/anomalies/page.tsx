@@ -1,3 +1,5 @@
+"use client"
+
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -66,7 +68,7 @@ export default function AnomaliesPage() {
           <CardContent>
             <div className="text-2xl font-bold">45</div>
             <p className="text-xs text-muted-foreground flex items-center">
-                <ArrowDown className="h-3 w-3 mr-1 text-green-600"/> -10% vs mois dernier
+                <ArrowUp className="h-3 w-3 mr-1 text-green-600"/> -10% vs mois dernier
             </p>
           </CardContent>
         </Card>
@@ -128,7 +130,7 @@ export default function AnomaliesPage() {
                             <TableCell>{anomaly.date}</TableCell>
                             <TableCell>{anomaly.reporter}</TableCell>
                             <TableCell>{anomaly.type}</TableCell>
-                            <TableCell><Badge variant={getStatusVariant(anomaly.status)}>{anomaly.status}</Badge></TableCell>
+                            <TableCell><Badge variant={getStatusVariant(anomaly.status) as any}>{anomaly.status}</Badge></TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
