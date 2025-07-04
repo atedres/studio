@@ -24,6 +24,7 @@ import {
 import { LanguageSwitcher } from "@/components/language-switcher"
 import { UserNav } from "@/components/user-nav"
 import { usePathname } from 'next/navigation'
+import { ThemeSwitcher } from "@/components/theme-switcher"
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
@@ -84,6 +85,7 @@ export default function DashboardLayout({
             <div className="w-full flex-1">
               {/* Optional: Add breadcrumbs or page title here */}
             </div>
+            <ThemeSwitcher />
             <LanguageSwitcher />
             <UserNav />
           </header>
