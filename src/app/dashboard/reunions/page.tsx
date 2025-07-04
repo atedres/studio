@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { List, PlusCircle, Video } from "lucide-react"
+import { List, PlusCircle, Video, Users } from "lucide-react"
 
 const upcomingMeetings = [
     {
