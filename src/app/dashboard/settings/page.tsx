@@ -1,3 +1,9 @@
+
+"use client"
+
+import React, { useState, useEffect } from "react"
+import { useAuth } from "@/hooks/use-auth"
+import { useToast } from "@/hooks/use-toast"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -9,17 +15,55 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
-import { User, Bell, Lock, Users } from "lucide-react"
+import { User, Bell, Lock, Users, Loader2 } from "lucide-react"
 
 export default function SettingsPage() {
+  const { user, updateUserProfile } = useAuth()
+  const { toast } = useToast()
+
+  const [displayName, setDisplayName] = useState("")
+  const [email, setEmail] = useState("")
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
+  
+  useEffect(() => {
+    if (user) {
+        setDisplayName(user.displayName || "")
+        setEmail(user.email || "")
+    }
+  }, [user])
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!displayName.trim()) {
+        toast({
+            variant: "destructive",
+            title: "Nom Invalide",
+            description: "Le nom ne peut pas être vide.",
+        })
+        return;
+    }
+    
+    setIsUpdatingProfile(true)
+    try {
+        if (updateUserProfile) {
+          await updateUserProfile({ displayName })
+          toast({
+              title: "Profil Mis à Jour",
+              description: "Votre nom a été mis à jour avec succès.",
+          })
+        }
+    } catch (error) {
+        console.error(error)
+        toast({
+            variant: "destructive",
+            title: "Erreur",
+            description: "Impossible de mettre à jour le profil.",
+        })
+    } finally {
+        setIsUpdatingProfile(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -106,16 +150,21 @@ export default function SettingsPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> Mon Profil</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                    <div>
-                        <Label htmlFor="name">Nom</Label>
-                        <Input id="name" defaultValue="Admin" />
-                    </div>
-                     <div>
-                        <Label htmlFor="email-settings">Email</Label>
-                        <Input id="email-settings" type="email" defaultValue="admin@somasteel.com" />
-                    </div>
-                    <Button className="w-full bg-accent hover:bg-accent/90">Mettre à jour le profil</Button>
+                <CardContent>
+                  <form onSubmit={handleProfileUpdate} className="space-y-4">
+                      <div>
+                          <Label htmlFor="name">Nom</Label>
+                          <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+                      </div>
+                       <div>
+                          <Label htmlFor="email-settings">Email</Label>
+                          <Input id="email-settings" type="email" value={email} readOnly disabled />
+                      </div>
+                      <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isUpdatingProfile}>
+                          {isUpdatingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Mettre à jour le profil
+                      </Button>
+                  </form>
                 </CardContent>
              </Card>
         </div>
