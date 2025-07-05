@@ -1,4 +1,8 @@
 
+"use client"
+
+import React, { useState, useEffect } from "react"
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -10,33 +14,63 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { PlusCircle, Video, Users } from "lucide-react"
-import Link from "next/link"
+import { Skeleton } from "@/components/ui/skeleton"
+import { db } from "@/lib/firebase"
+import { collection, getDocs, query, orderBy, where } from "firebase/firestore"
 
-const upcomingMeetings = [
-    {
-        title: "Réunion mensuelle SST - Juillet",
-        date: "2024-07-28",
-        time: "10:00 - 11:30",
-        type: "Mensuelle",
-        participants: 12
-    },
-    {
-        title: "Revue du plan d'action - Incident INC-0123",
-        date: "2024-08-02",
-        time: "14:00 - 15:00",
-        type: "Suivi",
-        participants: 5
-    },
-    {
-        title: "Formation Nouveaux Arrivants - Risques Chimiques",
-        date: "2024-08-05",
-        time: "09:00 - 12:00",
-        type: "Formation",
-        participants: 8
-    }
-]
+interface Reunion {
+    id: string;
+    objet: string;
+    date: { seconds: number; nanoseconds: number };
+    heure: string;
+    source: string;
+    collaborateurs: string;
+}
 
 export default function ReunionsPage() {
+  const [reunions, setReunions] = useState<Reunion[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedDate, setSelectedDate] = React.useState<Date | undefined>(new Date())
+
+  useEffect(() => {
+    const fetchReunions = async () => {
+        setLoading(true);
+        try {
+            const q = query(collection(db, "reunions"), where("date", ">=", new Date()), orderBy("date", "asc"));
+            const querySnapshot = await getDocs(q);
+            const reunionsData = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as Reunion[];
+            setReunions(reunionsData);
+        } catch (error) {
+            console.error("Error fetching meetings: ", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    fetchReunions();
+  }, []);
+
+  const renderSkeleton = () => (
+    [...Array(3)].map((_, i) => (
+        <div key={i} className="flex items-center justify-between p-4 rounded-lg border">
+            <div className="flex items-center gap-4 w-full">
+                <div className="flex flex-col text-center bg-muted p-2 rounded-md w-20">
+                    <Skeleton className="h-4 w-10 mx-auto" />
+                    <Skeleton className="h-6 w-8 mx-auto mt-1" />
+                </div>
+                <div className="flex-1 space-y-2">
+                    <Skeleton className="h-5 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                </div>
+            </div>
+            <Skeleton className="h-10 w-10 rounded-md" />
+        </div>
+    ))
+  )
+
   return (
     <div className="space-y-6">
       <div>
@@ -60,27 +94,32 @@ export default function ReunionsPage() {
                 </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-            {upcomingMeetings.map((meeting, index) => (
-                <div key={index} className="flex items-center justify-between p-4 rounded-lg border">
-                    <div className="flex items-center gap-4">
-                        <div className="flex flex-col text-center bg-muted p-2 rounded-md w-20">
-                            <span className="text-sm font-semibold">{new Date(meeting.date).toLocaleDateString('fr-FR', { month: 'short' })}</span>
-                            <span className="text-2xl font-bold">{new Date(meeting.date).getDate()}</span>
-                        </div>
-                        <div>
-                            <h3 className="font-semibold">{meeting.title}</h3>
-                            <p className="text-sm text-muted-foreground">{meeting.time}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                                <Badge variant="secondary">{meeting.type}</Badge>
-                                <span className="text-xs text-muted-foreground flex items-center"><Users className="h-3 w-3 mr-1" />{meeting.participants} participants</span>
+                {loading ? renderSkeleton() : reunions.map((meeting) => (
+                    <div key={meeting.id} className="flex items-center justify-between p-4 rounded-lg border">
+                        <div className="flex items-center gap-4">
+                            <div className="flex flex-col text-center bg-muted p-2 rounded-md w-20">
+                                <span className="text-sm font-semibold">{new Date(meeting.date.seconds * 1000).toLocaleDateString('fr-FR', { month: 'short' })}</span>
+                                <span className="text-2xl font-bold">{new Date(meeting.date.seconds * 1000).getDate()}</span>
+                            </div>
+                            <div>
+                                <h3 className="font-semibold">{meeting.objet}</h3>
+                                <p className="text-sm text-muted-foreground">{meeting.heure}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="secondary">{meeting.source}</Badge>
+                                    <span className="text-xs text-muted-foreground flex items-center"><Users className="h-3 w-3 mr-1" />
+                                        {meeting.collaborateurs.split(/, ?|\n/).filter(p => p.trim() !== '').length} participants
+                                    </span>
+                                </div>
                             </div>
                         </div>
+                        <Button variant="ghost" size="icon">
+                            <Video className="h-5 w-5 text-accent" />
+                        </Button>
                     </div>
-                    <Button variant="ghost" size="icon">
-                        <Video className="h-5 w-5 text-accent" />
-                    </Button>
-                </div>
-             ))}
+                 ))}
+                 {!loading && reunions.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">Aucune réunion à venir.</p>
+                )}
             </CardContent>
         </Card>
         <Card>
@@ -91,7 +130,8 @@ export default function ReunionsPage() {
             <CardContent>
                 <Calendar
                     mode="single"
-                    selected={new Date()}
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
                     className="rounded-md border p-0"
                 />
             </CardContent>

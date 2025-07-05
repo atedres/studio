@@ -1,8 +1,9 @@
 
 "use client"
 
-import React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -18,7 +19,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, ArrowLeft } from "lucide-react"
+import { Calendar as CalendarIcon, ArrowLeft, Loader2 } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 
 const reunionSchema = z.object({
   nature: z.enum(["presentielle", "distancielle"], { required_error: "La nature de la réunion est requise." }),
@@ -38,6 +41,8 @@ type ReunionFormValues = z.infer<typeof reunionSchema>
 export default function NewReunionPage() {
   const { toast } = useToast()
   const { user } = useAuth()
+  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const form = useForm<ReunionFormValues>({
     resolver: zodResolver(reunionSchema),
@@ -48,17 +53,45 @@ export default function NewReunionPage() {
     },
   })
 
-  function onSubmit(data: ReunionFormValues) {
-    // In a real app, you would handle file upload here.
+  async function onSubmit(data: ReunionFormValues) {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Erreur d'authentification",
+            description: "Vous devez être connecté pour soumettre un formulaire.",
+        })
+        return
+    }
+    setIsSubmitting(true)
+    
+    // Note: Actual file upload to Firebase Storage would happen here.
+    // For now, we're just saving the file name if it exists.
     const dataToSubmit = {
         ...data,
-        support: data.support?.[0]?.name || 'Aucun fichier'
+        support: data.support?.[0]?.name || 'Aucun fichier',
+        createdBy: user.uid,
+        userEmail: user.email,
+        createdAt: serverTimestamp(),
+        status: "Planifiée",
     };
-    console.log(dataToSubmit)
-    toast({
-      title: "Réunion Programmée",
-      description: "La réunion a été ajoutée au planning et les invitations envoyées.",
-    })
+
+    try {
+      await addDoc(collection(db, "reunions"), dataToSubmit);
+      toast({
+        title: "Réunion Programmée",
+        description: "La réunion a été ajoutée au planning.",
+      })
+      router.push('/dashboard/reunions')
+    } catch (error) {
+      console.error("Error adding document: ", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible d'enregistrer la réunion. Veuillez réessayer.",
+      })
+    } finally {
+        setIsSubmitting(false)
+    }
   }
 
   return (
@@ -158,7 +191,8 @@ export default function NewReunionPage() {
           </Card>
 
           <div className="flex justify-end">
-            <Button type="submit" className="bg-primary hover:bg-primary/90">
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Soumettre
             </Button>
           </div>
