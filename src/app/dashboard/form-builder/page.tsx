@@ -213,7 +213,6 @@ export default function FormBuilderPage() {
                       {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4"/>}
                       Enregistrer ce modèle de formulaire
                     </Button>
-                    <Button type="button" variant="secondary">Soumettre le formulaire rempli</Button>
                   </CardFooter>
                 )}
             </Card>
