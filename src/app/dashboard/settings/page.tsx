@@ -1,9 +1,12 @@
-
 "use client"
 
 import React, { useState, useEffect } from "react"
 import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
+import { zodResolver } from "@hookform/resolvers/zod"
+import * as z from "zod"
+import { useForm } from "react-hook-form"
+
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -12,19 +15,57 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { User, Bell, Lock, Users, Loader2 } from "lucide-react"
 
+const passwordSchema = z.object({
+    currentPassword: z.string().min(1, "Le mot de passe actuel est requis."),
+    newPassword: z.string().min(6, "Le nouveau mot de passe doit contenir au moins 6 caractères."),
+    confirmPassword: z.string(),
+  }).refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Les nouveaux mots de passe ne correspondent pas.",
+    path: ["confirmPassword"],
+});
+
+type PasswordFormValues = z.infer<typeof passwordSchema>;
+
 export default function SettingsPage() {
-  const { user, updateUserProfile } = useAuth()
+  const { user, updateUserProfile, updateUserPassword } = useAuth()
   const { toast } = useToast()
 
   const [displayName, setDisplayName] = useState("")
   const [email, setEmail] = useState("")
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
+  const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
   
+  const passwordForm = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: {
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+    }
+  });
+
   useEffect(() => {
     if (user) {
         setDisplayName(user.displayName || "")
@@ -63,6 +104,33 @@ export default function SettingsPage() {
         setIsUpdatingProfile(false)
     }
   }
+
+  const handlePasswordUpdate = async (values: PasswordFormValues) => {
+    if (!updateUserPassword) return;
+
+    try {
+        await updateUserPassword(values.currentPassword, values.newPassword);
+        toast({
+            title: "Succès",
+            description: "Votre mot de passe a été changé avec succès.",
+        });
+        passwordForm.reset();
+        setIsPasswordDialogOpen(false);
+    } catch (error: any) {
+        console.error("Password change error:", error);
+        let description = "Une erreur est survenue.";
+        if (error.code === 'auth/wrong-password') {
+            description = "Le mot de passe actuel est incorrect.";
+            passwordForm.setError("currentPassword", { type: "manual", message: "Mot de passe incorrect." });
+        }
+        toast({
+            variant: "destructive",
+            title: "Erreur de changement de mot de passe",
+            description,
+        });
+    }
+  }
+
 
   return (
     <div className="space-y-6">
@@ -140,7 +208,68 @@ export default function SettingsPage() {
                     <CardTitle className="flex items-center gap-2"><Lock className="h-5 w-5" /> Sécurité</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <Button variant="outline" className="w-full">Changer le mot de passe</Button>
+                    <Dialog open={isPasswordDialogOpen} onOpenChange={setIsPasswordDialogOpen}>
+                        <DialogTrigger asChild>
+                             <Button variant="outline" className="w-full">Changer le mot de passe</Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Changer le mot de passe</DialogTitle>
+                                <DialogDescription>
+                                    Entrez votre mot de passe actuel et votre nouveau mot de passe.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <Form {...passwordForm}>
+                                <form onSubmit={passwordForm.handleSubmit(handlePasswordUpdate)} className="space-y-4">
+                                     <FormField
+                                        control={passwordForm.control}
+                                        name="currentPassword"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Mot de passe actuel</FormLabel>
+                                                <FormControl>
+                                                    <Input type="password" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={passwordForm.control}
+                                        name="newPassword"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Nouveau mot de passe</FormLabel>
+                                                <FormControl>
+                                                    <Input type="password" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <FormField
+                                        control={passwordForm.control}
+                                        name="confirmPassword"
+                                        render={({ field }) => (
+                                            <FormItem>
+                                                <FormLabel>Confirmer le nouveau mot de passe</FormLabel>
+                                                <FormControl>
+                                                    <Input type="password" {...field} />
+                                                </FormControl>
+                                                <FormMessage />
+                                            </FormItem>
+                                        )}
+                                    />
+                                    <DialogFooter>
+                                        <Button type="submit" disabled={passwordForm.formState.isSubmitting}>
+                                            {passwordForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                            Enregistrer
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </Form>
+                        </DialogContent>
+                    </Dialog>
                     <Button variant="outline" className="w-full">Activer l'authentification à deux facteurs</Button>
                     <p className="text-xs text-muted-foreground text-center pt-2">Dernière modification de mot de passe: il y a 3 mois.</p>
                 </CardContent>

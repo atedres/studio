@@ -1,4 +1,3 @@
-
 "use client"
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -8,6 +7,9 @@ import {
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
   updateProfile,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword as firebaseUpdatePassword,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -18,6 +20,7 @@ interface AuthContextType {
   signIn: typeof signInWithEmailAndPassword;
   signOut: () => Promise<void>;
   updateUserProfile?: (data: { displayName: string }) => Promise<void>;
+  updateUserPassword?: (oldPass: string, newPass: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,6 +50,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateUserPassword = async (oldPass: string, newPass: string) => {
+    const currentUser = auth.currentUser;
+    if (currentUser && currentUser.email) {
+        const credential = EmailAuthProvider.credential(currentUser.email, oldPass);
+        // Re-authenticate the user
+        await reauthenticateWithCredential(currentUser, credential);
+        // Now update the password
+        await firebaseUpdatePassword(currentUser, newPass);
+    } else {
+        throw new Error("User not authenticated or email not available.");
+    }
+  };
+
   const signOut = async () => {
     await firebaseSignOut(auth);
     router.push('/');
@@ -58,6 +74,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
     signOut,
     updateUserProfile,
+    updateUserPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
