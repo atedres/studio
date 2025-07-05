@@ -1,3 +1,4 @@
+
 'use client'
 
 import { useRouter } from 'next/navigation'
@@ -21,8 +22,8 @@ import { useToast } from "@/hooks/use-toast"
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
-  const [email, setEmail] = useState("admin@somasteel.com")
-  const [password, setPassword] = useState("password")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [checkingAuth, setCheckingAuth] = useState(true);
 

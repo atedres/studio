@@ -20,8 +20,9 @@ import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
 import { Calendar as CalendarIcon, ArrowLeft, Loader2 } from "lucide-react"
-import { db } from "@/lib/firebase"
+import { db, storage } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 
 const reunionSchema = z.object({
   nature: z.enum(["presentielle", "distancielle"], { required_error: "La nature de la réunion est requise." }),
@@ -71,11 +72,33 @@ export default function NewReunionPage() {
     }
     setIsSubmitting(true)
     
-    // Note: Actual file upload to Firebase Storage would happen here.
-    // For now, we're just saving the file name if it exists.
+    let supportUrl = 'Aucun fichier';
+
+    // Handle file upload if a file is selected
+    if (data.support && data.support.length > 0) {
+        const file = data.support[0];
+        const storageRef = ref(storage, `supports-reunions/${Date.now()}-${file.name}`);
+        try {
+            const uploadTask = await uploadBytes(storageRef, file);
+            supportUrl = await getDownloadURL(uploadTask.ref);
+        } catch (e) {
+            console.error("Upload error:", e);
+            toast({
+                variant: "destructive",
+                title: "Erreur de Téléversement",
+                description: "Le fichier de support n'a pas pu être envoyé.",
+            });
+            setIsSubmitting(false);
+            return;
+        }
+    }
+    
+    // Prepare data for Firestore, excluding the local file object
+    const { support, ...reunionData } = data;
+
     const dataToSubmit = {
-        ...data,
-        support: data.support?.[0]?.name || 'Aucun fichier',
+        ...reunionData,
+        supportUrl: supportUrl, // Store the URL or 'Aucun fichier'
         createdBy: user.uid,
         userEmail: user.email,
         createdAt: serverTimestamp(),
