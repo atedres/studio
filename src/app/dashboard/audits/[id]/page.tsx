@@ -127,8 +127,10 @@ export default function DialogueSecuriteDetailPage() {
                         <p className="text-muted-foreground">ID: {ds.id}</p>
                     </div>
                 </div>
-                 <Button>
-                    <Edit className="mr-2 h-4 w-4" /> Modifier
+                 <Button asChild>
+                    <Link href={`/dashboard/audits/${ds.id}/edit`}>
+                        <Edit className="mr-2 h-4 w-4" /> Modifier
+                    </Link>
                 </Button>
             </div>
 
@@ -244,3 +246,5 @@ export default function DialogueSecuriteDetailPage() {
         </div>
     );
 }
+
+    
