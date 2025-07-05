@@ -26,6 +26,19 @@ import { db } from "@/lib/firebase"
 import { collection, getDocs, query, where, Timestamp } from "firebase/firestore"
 import { format, isPast } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Action {
     id: string; // combination of docId and index
@@ -40,7 +53,13 @@ interface Action {
 
 export default function ActionPlanPage() {
     const [actions, setActions] = useState<Action[]>([])
+    const [filteredActions, setFilteredActions] = useState<Action[]>([])
     const [loading, setLoading] = useState(true)
+    const [filters, setFilters] = useState({
+        overdueOnly: false,
+        source: 'all', // 'all', 'CAA', 'DS'
+        status: 'all', // 'all', 'En cours', 'Non réalisée'
+    });
 
     useEffect(() => {
         const fetchActions = async () => {
@@ -115,6 +134,16 @@ export default function ActionPlanPage() {
         fetchActions();
     }, []);
 
+    useEffect(() => {
+        const tempActions = actions.filter(action => {
+            const sourceMatch = filters.source === 'all' || action.source === filters.source;
+            const statusMatch = filters.status === 'all' || action.status === filters.status;
+            const overdueMatch = !filters.overdueOnly || action.isOverdue;
+            return sourceMatch && statusMatch && overdueMatch;
+        });
+        setFilteredActions(tempActions);
+    }, [actions, filters]);
+
     const getStatusVariant = (status: string, isOverdue: boolean) => {
         if (isOverdue) return "destructive";
         switch (status) {
@@ -138,6 +167,13 @@ export default function ActionPlanPage() {
         ))
     );
 
+    const getEmptyStateMessage = () => {
+        if (actions.length === 0) {
+            return "Aucune action ouverte. Excellent travail !";
+        }
+        return "Aucune action ne correspond à vos critères de filtre.";
+    }
+
     return (
         <div className="space-y-6">
             <div>
@@ -152,10 +188,45 @@ export default function ActionPlanPage() {
                         <CardTitle>Liste des Actions Ouvertes</CardTitle>
                         <CardDescription>Actions issues des Dialogues Sécurité et des Chasses aux Anomalies.</CardDescription>
                     </div>
-                    <Button variant="outline">
-                        <ListFilter className="mr-2 h-4 w-4" />
-                        Filtrer
-                    </Button>
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline">
+                                <ListFilter className="mr-2 h-4 w-4" />
+                                Filtrer
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuLabel>Filtrer les actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuCheckboxItem
+                                checked={filters.overdueOnly}
+                                onCheckedChange={(checked) => setFilters(prev => ({...prev, overdueOnly: !!checked}))}
+                            >
+                                En retard uniquement
+                            </DropdownMenuCheckboxItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>Source</DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                    <DropdownMenuRadioGroup value={filters.source} onValueChange={(value) => setFilters(prev => ({ ...prev, source: value }))}>
+                                        <DropdownMenuRadioItem value="all">Toutes</DropdownMenuRadioItem>
+                                        <DropdownMenuRadioItem value="CAA">CAA</DropdownMenuRadioItem>
+                                        <DropdownMenuRadioItem value="DS">DS</DropdownMenuRadioItem>
+                                    </DropdownMenuRadioGroup>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                             <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>Statut</DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                    <DropdownMenuRadioGroup value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
+                                        <DropdownMenuRadioItem value="all">Tous</DropdownMenuRadioItem>
+                                        <DropdownMenuRadioItem value="En cours">En cours</DropdownMenuRadioItem>
+                                        <DropdownMenuRadioItem value="Non réalisée">Non réalisée</DropdownMenuRadioItem>
+                                    </DropdownMenuRadioGroup>
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </CardHeader>
                 <CardContent>
                     <Table>
@@ -170,7 +241,7 @@ export default function ActionPlanPage() {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {loading ? renderSkeleton() : actions.length > 0 ? actions.map((action) => (
+                            {loading ? renderSkeleton() : filteredActions.length > 0 ? filteredActions.map((action) => (
                                 <TableRow key={action.id} className={action.isOverdue ? "bg-destructive/10" : ""}>
                                     <TableCell className="font-medium">{action.description}</TableCell>
                                     <TableCell>{action.source}</TableCell>
@@ -195,7 +266,7 @@ export default function ActionPlanPage() {
                             )) : (
                                 <TableRow>
                                     <TableCell colSpan={6} className="h-24 text-center">
-                                        Aucune action ouverte. Excellent travail !
+                                       {getEmptyStateMessage()}
                                     </TableCell>
                                 </TableRow>
                             )}
