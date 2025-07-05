@@ -7,8 +7,6 @@ import {
   AlertOctagon,
   CheckSquare,
   Grab,
-  ListTodo,
-  PieChart as PieChartIcon,
   Users,
 } from "lucide-react"
 import {
@@ -25,9 +23,9 @@ import {
   Cell
 } from "recharts"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, where, Timestamp } from "firebase/firestore"
-import { subMonths, format, startOfMonth, endOfMonth } from 'date-fns';
-
+import { collection, getDocs } from "firebase/firestore"
+import { subMonths, format, startOfMonth } from 'date-fns';
+import { useAuth } from '@/hooks/use-auth';
 
 import {
   Card,
@@ -44,8 +42,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 // Interfaces for our Firestore data
 interface Anomaly {
+  description: string;
   echeance?: { seconds: number };
-  statut?: string;
+  responsable?: string;
+  statut?: string; // For DS
+  avancement?: string; // for CAA
   famille?: string; // For CAA
   familleRisque?: string; // For DS
 }
@@ -70,11 +71,16 @@ interface DashboardData {
     total: number;
     ceMois: number;
   };
+  totalAnomalies: number;
   incidentsRecents: ChasseAuxAnomalies[];
   anomaliesParType: { name: string; value: number; fill: string }[];
   activiteParMois: { name: string; Dialogues: number; CAA: number }[];
 }
 
+interface Task extends Anomaly {
+    taskId: string;
+    docSource: string;
+}
 
 const CHART_COLORS = [
   'hsl(var(--chart-1))',
@@ -87,9 +93,15 @@ const CHART_COLORS = [
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [myTasks, setMyTasks] = useState<Task[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!user) { // Don't fetch if user is not loaded
+          setLoading(false);
+          return;
+      }
       setLoading(true);
       try {
         const dialoguesSnapshot = await getDocs(collection(db, "dialoguesSecurite"));
@@ -101,9 +113,13 @@ export default function DashboardPage() {
         // 1. Actions en retard
         const now = new Date();
         let actionsEnRetard = 0;
-        const allAnomalies = [...dialogues.flatMap(d => d.anomalies), ...caas.flatMap(c => c.anomalies)];
+        const allAnomaliesFromDS = dialogues.flatMap(d => d.anomalies);
+        const allAnomaliesFromCAA = caas.flatMap(c => c.anomalies);
+        const allAnomalies = [...allAnomaliesFromDS, ...allAnomaliesFromCAA];
+        
         allAnomalies.forEach(anomaly => {
-          if (anomaly.echeance && new Date(anomaly.echeance.seconds * 1000) < now && anomaly.statut !== "Réalisée") {
+          const status = anomaly.statut || anomaly.avancement;
+          if (anomaly.echeance && new Date(anomaly.echeance.seconds * 1000) < now && status !== "Réalisée") {
             actionsEnRetard++;
           }
         });
@@ -159,9 +175,25 @@ export default function DashboardPage() {
             ...values
         }));
 
+        // 6. User tasks
+        const userDialoguesTasks = dialogues.flatMap(d => 
+            d.anomalies
+             .map((a, i) => ({ ...a, taskId: `${d.id}-${i}`, docSource: `DS ${d.id.substring(0,4)}...` }))
+             .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.statut !== 'Réalisée')
+        );
+
+        const userCaasTasks = caas.flatMap(c => 
+            c.anomalies
+             .map((a, i) => ({ ...a, taskId: `${c.id}-${i}`, docSource: `CAA ${c.id.substring(0,4)}...`}))
+             .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.avancement !== 'Réalisée')
+        );
+        
+        setMyTasks([...userDialoguesTasks, ...userCaasTasks]);
+
         setData({
           actionsEnRetard,
           auditsRealises,
+          totalAnomalies: allAnomalies.length,
           incidentsRecents,
           anomaliesParType,
           activiteParMois
@@ -174,7 +206,7 @@ export default function DashboardPage() {
       }
     };
     fetchData();
-  }, []);
+  }, [user]);
 
   return (
     <div className="flex-1 space-y-4">
@@ -255,12 +287,12 @@ export default function DashboardPage() {
             </Card>
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Taux de Respect Planning</CardTitle>
+                    <CardTitle className="text-sm font-medium">Total Anomalies Signalées</CardTitle>
                     <Activity className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                    <div className="text-2xl font-bold">94%</div>
-                    <p className="text-xs text-muted-foreground">Basé sur les audits planifiés</p>
+                     {loading ? <Skeleton className="h-8 w-12" /> : <div className="text-2xl font-bold">{data?.totalAnomalies}</div>}
+                    <p className="text-xs text-muted-foreground">Toutes sources confondues</p>
                 </CardContent>
             </Card>
         </div>
@@ -326,22 +358,26 @@ export default function DashboardPage() {
                 <Grab className="cursor-move text-muted-foreground" />
             </CardHeader>
             <CardContent className="space-y-4">
-                 <div className="flex items-center space-x-2">
-                    <Checkbox id="task1" />
-                    <Label htmlFor="task1" className="flex-1">Finaliser le rapport d'audit Q2</Label>
-                 </div>
-                 <div className="flex items-center space-x-2">
-                    <Checkbox id="task2" />
-                    <Label htmlFor="task2" className="flex-1">Valider l'action corrective AC-045</Label>
-                 </div>
-                 <div className="flex items-center space-x-2">
-                    <Checkbox id="task3" defaultChecked/>
-                    <Label htmlFor="task3" className="flex-1 line-through text-muted-foreground">Planifier la réunion SST de Juillet</Label>
-                 </div>
-                 <div className="flex items-center space-x-2">
-                    <Checkbox id="task4" />
-                    <Label htmlFor="task4" className="flex-1">Inspecter l'équipement de levage B-12</Label>
-                 </div>
+                 {loading ? (
+                    [...Array(4)].map((_, i) => (
+                        <div key={i} className="flex items-center space-x-2">
+                            <Skeleton className="h-4 w-4" />
+                            <Skeleton className="h-4 flex-1" />
+                        </div>
+                    ))
+                ) : myTasks.length > 0 ? (
+                    myTasks.map((task) => (
+                        <div key={task.taskId} className="flex items-center space-x-2">
+                            <Checkbox id={task.taskId} />
+                            <Label htmlFor={task.taskId} className="flex-1 font-normal">
+                                {task.description}
+                                <span className="ml-2 text-xs text-muted-foreground">({task.docSource})</span>
+                            </Label>
+                        </div>
+                    ))
+                ) : (
+                    <p className="text-sm text-muted-foreground text-center pt-4">Aucune tâche en attente. Bravo !</p>
+                )}
             </CardContent>
         </Card>
 

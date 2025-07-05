@@ -92,9 +92,6 @@ export default function LoginPage() {
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Se connecter / تسجيل الدخول
             </Button>
-            <p className="text-xs text-muted-foreground text-center">
-              Possibilité de SSO via Microsoft.
-            </p>
           </CardFooter>
         </form>
       </Card>
