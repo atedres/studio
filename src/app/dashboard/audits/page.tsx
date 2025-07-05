@@ -1,5 +1,9 @@
-import { FilePlus2, Filter } from "lucide-react"
+
+"use client"
+
+import React, { useState, useEffect } from "react"
 import Link from "next/link"
+import { FilePlus2, Filter } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -17,54 +21,52 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
+import { db } from "@/lib/firebase"
+import { collection, getDocs, query, orderBy } from "firebase/firestore"
 
-const dialogues = [
-  {
-    id: "DS-2407-001",
-    date: "2024-07-15",
-    observateur: "Karim Alaoui",
-    zone: "Atelier de Production",
-    anomalies: 2,
-    status: "Validé",
-  },
-  {
-    id: "DS-2407-002",
-    date: "2024-07-18",
-    observateur: "Fatima Zahra",
-    zone: "Zone de Stockage",
-    anomalies: 0,
-    status: "En attente de validation",
-  },
-  {
-    id: "DS-2407-003",
-    date: "2024-07-20",
-    observateur: "Youssef El Fassi",
-    zone: "Ligne d'assemblage 2",
-    anomalies: 1,
-    status: "Actions correctives ouvertes",
-  },
-  {
-    id: "DS-2407-004",
-    date: "2024-07-22",
-    observateur: "Amina Benjelloun",
-    zone: "Maintenance",
-    anomalies: 0,
-    status: "Validé",
-  },
-    {
-    id: "DS-2407-005",
-    date: "2024-07-25",
-    observateur: "Karim Alaoui",
-    zone: "Expédition",
-    anomalies: 3,
-    status: "Brouillon",
-  },
-]
+interface Dialogue {
+  id: string;
+  date: {
+      seconds: number;
+      nanoseconds: number;
+  };
+  observateur: string;
+  zone: string;
+  anomalies: any[];
+  status: string;
+}
 
 export default function DialoguesSecuritePage() {
+  const [dialogues, setDialogues] = useState<Dialogue[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchDialogues = async () => {
+        setLoading(true)
+        try {
+            const q = query(collection(db, "dialoguesSecurite"), orderBy("date", "desc"));
+            const querySnapshot = await getDocs(q);
+            const dialoguesData = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as Dialogue[];
+            setDialogues(dialoguesData);
+        } catch (error) {
+            console.error("Error fetching dialogues: ", error);
+            // Optionally, show a toast message here
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    fetchDialogues();
+  }, []);
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "Validé":
+      case "Clôturée":
         return "default"
       case "Brouillon":
         return "secondary"
@@ -76,6 +78,19 @@ export default function DialoguesSecuritePage() {
         return "secondary"
     }
   }
+
+  const renderSkeleton = () => (
+    [...Array(5)].map((_, i) => (
+      <TableRow key={i}>
+        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+        <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+      </TableRow>
+    ))
+  )
 
   return (
     <div className="space-y-6">
@@ -117,13 +132,13 @@ export default function DialoguesSecuritePage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dialogues.map((dialogue) => (
+              {loading ? renderSkeleton() : dialogues.map((dialogue) => (
                 <TableRow key={dialogue.id}>
-                  <TableCell className="font-medium">{dialogue.id}</TableCell>
-                  <TableCell>{dialogue.date}</TableCell>
+                  <TableCell className="font-medium">{dialogue.id.substring(0,8)}...</TableCell>
+                  <TableCell>{new Date(dialogue.date.seconds * 1000).toLocaleDateString('fr-FR')}</TableCell>
                   <TableCell>{dialogue.observateur}</TableCell>
                   <TableCell>{dialogue.zone}</TableCell>
-                  <TableCell>{dialogue.anomalies}</TableCell>
+                  <TableCell className="text-center">{dialogue.anomalies.length}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusVariant(dialogue.status) as any}>{dialogue.status}</Badge>
                   </TableCell>

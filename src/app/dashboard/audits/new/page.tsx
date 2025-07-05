@@ -3,6 +3,7 @@
 
 import React from 'react'
 import Link from 'next/link'
+import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useFieldArray, useForm } from "react-hook-form"
 import * as z from "zod"
@@ -18,7 +19,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft } from "lucide-react"
+import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2 } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 
 const dialogueSecuriteSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -45,12 +48,13 @@ const dialogueSecuriteSchema = z.object({
 
 type DialogueSecuriteFormValues = z.infer<typeof dialogueSecuriteSchema>
 
-// Mock data for dropdowns
 const famillesDeRisque = ["Chute de plain-pied", "Heurt", "Risque chimique", "Risque électrique", "Manutention manuelle", "Autre"];
 
 export default function NewDialogueSecuritePage() {
   const { toast } = useToast()
   const { user } = useAuth()
+  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const form = useForm<DialogueSecuriteFormValues>({
     resolver: zodResolver(dialogueSecuriteSchema),
@@ -72,12 +76,39 @@ export default function NewDialogueSecuritePage() {
     control: form.control,
   })
 
-  function onSubmit(data: DialogueSecuriteFormValues) {
-    console.log(data)
-    toast({
-      title: "Formulaire Soumis",
-      description: "Les données du dialogue de sécurité ont été enregistrées.",
-    })
+  async function onSubmit(data: DialogueSecuriteFormValues) {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Erreur d'authentification",
+            description: "Vous devez être connecté pour soumettre un formulaire.",
+        })
+        return
+    }
+    setIsSubmitting(true)
+    try {
+      await addDoc(collection(db, "dialoguesSecurite"), {
+        ...data,
+        createdBy: user.uid,
+        userEmail: user.email,
+        createdAt: serverTimestamp(),
+        status: "En attente de validation",
+      });
+      toast({
+        title: "Formulaire Soumis",
+        description: "Le dialogue de sécurité a été envoyé pour validation.",
+      })
+      router.push('/dashboard/audits')
+    } catch (error) {
+      console.error("Error adding document: ", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible d'enregistrer le formulaire. Veuillez réessayer.",
+      })
+    } finally {
+        setIsSubmitting(false)
+    }
   }
 
   function onSaveDraft(data: DialogueSecuriteFormValues) {
@@ -326,7 +357,8 @@ export default function NewDialogueSecuritePage() {
             <Button type="button" variant="secondary" onClick={() => onSaveDraft(form.getValues())}>
               Enregistrer le brouillon
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90">
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Soumettre pour validation
             </Button>
           </div>
