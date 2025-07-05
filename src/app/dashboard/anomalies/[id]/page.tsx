@@ -25,11 +25,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { Separator } from '@/components/ui/separator';
 
 
 interface Anomaly {
     description: string;
     famille: string;
+    criticite: "Mineure" | "Moyenne" | "Majeure" | "Critique";
     actionsCorrectives: string;
     responsable: string;
     echeance?: Timestamp;
@@ -108,6 +110,16 @@ export default function ChasseAuxAnomaliesDetailPage() {
             case "Réalisée": return "default";
             case "En cours": return "outline";
             case "Non réalisée": return "destructive";
+            default: return "secondary";
+        }
+    };
+
+    const getCriticiteVariant = (criticite: string) => {
+        switch (criticite) {
+            case "Critique": return "destructive";
+            case "Majeure": return "default";
+            case "Moyenne": return "secondary";
+            case "Mineure": return "outline";
             default: return "secondary";
         }
     };
@@ -235,30 +247,40 @@ export default function ChasseAuxAnomaliesDetailPage() {
                                 <AlertTriangle className="h-5 w-5 text-destructive" />
                                 Anomalie n°{index + 1}
                             </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                            <div className="space-y-4">
                                 <div className="space-y-1">
-                                    <p className="font-medium">Description</p>
-                                    <p className="text-muted-foreground">{anomalie.description}</p>
+                                    <p className="font-medium text-sm">Description</p>
+                                    <p className="text-sm text-muted-foreground">{anomalie.description}</p>
                                 </div>
-                                 <div className="space-y-1">
-                                    <p className="font-medium">Famille de Risque</p>
-                                    <p className="text-muted-foreground">{anomalie.famille}</p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4 text-sm">
+                                    <div className="space-y-1">
+                                        <p className="font-medium">Famille de Risque</p>
+                                        <p className="text-muted-foreground">{anomalie.famille}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="font-medium">Criticité</p>
+                                        <Badge variant={getCriticiteVariant(anomalie.criticite) as any}>{anomalie.criticite || "N/A"}</Badge>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="font-medium">Avancement</p>
+                                        <Badge variant={getStatusVariant(anomalie.avancement)}>{anomalie.avancement}</Badge>
+                                    </div>
                                 </div>
+                                <Separator/>
+                                <h5 className="font-medium text-sm pt-2">Plan d'action</h5>
                                 <div className="space-y-1 col-span-full">
-                                    <p className="font-medium">Actions Correctives</p>
-                                    <p className="text-muted-foreground">{anomalie.actionsCorrectives || "N/A"}</p>
+                                    <p className="font-medium text-sm">Actions Correctives</p>
+                                    <p className="text-sm text-muted-foreground">{anomalie.actionsCorrectives || "N/A"}</p>
                                 </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium">Responsable</p>
-                                    <p className="text-muted-foreground">{anomalie.responsable || "N/A"}</p>
-                                </div>
-                                 <div className="space-y-1">
-                                    <p className="font-medium">Échéance</p>
-                                    <p className="text-muted-foreground">{anomalie.echeance ? format(anomalie.echeance.toDate(), 'PPP', { locale: fr }) : 'N/A'}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="font-medium">Avancement</p>
-                                    <Badge variant={getStatusVariant(anomalie.avancement)}>{anomalie.avancement}</Badge>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4 text-sm">
+                                    <div className="space-y-1">
+                                        <p className="font-medium">Responsable</p>
+                                        <p className="text-muted-foreground">{anomalie.responsable || "N/A"}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <p className="font-medium">Échéance</p>
+                                        <p className="text-muted-foreground">{anomalie.echeance ? format(anomalie.echeance.toDate(), 'PPP', { locale: fr }) : 'N/A'}</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>

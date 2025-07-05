@@ -35,6 +35,7 @@ const chasseAuxAnomaliesSchema = z.object({
   anomalies: z.array(z.object({
     description: z.string().min(1, "La description est requise."),
     famille: z.string().min(1, "La famille de risque est requise."),
+    criticite: z.enum(["Mineure", "Moyenne", "Majeure", "Critique"], { required_error: "La criticité est requise." }),
     actionsCorrectives: z.string().optional().default(''),
     responsable: z.string().optional().default(''),
     echeance: z.date().optional(),
@@ -46,6 +47,7 @@ const chasseAuxAnomaliesSchema = z.object({
 type ChasseAuxAnomaliesFormValues = z.infer<typeof chasseAuxAnomaliesSchema>
 
 const famillesDeRisque = ["Chute de plain-pied", "Heurt", "Risque chimique", "Risque électrique", "Manutention manuelle", "Autre"];
+const criticites = ["Mineure", "Moyenne", "Majeure", "Critique"];
 const statutsAvancement = ["En cours", "Réalisée", "Non réalisée"];
 
 export default function NewChasseAuxAnomaliesPage() {
@@ -61,7 +63,8 @@ export default function NewChasseAuxAnomaliesPage() {
       date: new Date(),
       anomalies: [{ 
         description: '', 
-        famille: '', 
+        famille: '',
+        criticite: 'Moyenne',
         avancement: 'En cours', 
         actionsCorrectives: '', 
         responsable: '',
@@ -220,14 +223,24 @@ export default function NewChasseAuxAnomaliesPage() {
                         <FormField control={form.control} name={`anomalies.${index}.description`} render={({ field }) => (
                            <FormItem><FormLabel>Description de l'anomalie</FormLabel><FormControl><Textarea placeholder="Décrivez précisément l'anomalie..." {...field} /></FormControl><FormMessage /></FormItem>
                        )} />
-                        <FormField control={form.control} name={`anomalies.${index}.famille`} render={({ field }) => (
-                           <FormItem><FormLabel>Famille de risque</FormLabel>
-                               <Select onValueChange={field.onChange} defaultValue={field.value}>
-                               <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
-                               <SelectContent>{famillesDeRisque.map(famille => <SelectItem key={famille} value={famille}>{famille}</SelectItem>)}</SelectContent>
-                               </Select><FormMessage />
-                           </FormItem>
-                       )} />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name={`anomalies.${index}.famille`} render={({ field }) => (
+                               <FormItem><FormLabel>Famille de risque</FormLabel>
+                                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                   <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
+                                   <SelectContent>{famillesDeRisque.map(famille => <SelectItem key={famille} value={famille}>{famille}</SelectItem>)}</SelectContent>
+                                   </Select><FormMessage />
+                               </FormItem>
+                           )} />
+                           <FormField control={form.control} name={`anomalies.${index}.criticite`} render={({ field }) => (
+                                <FormItem><FormLabel>Criticité</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
+                                    <SelectContent>{criticites.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                                    </Select><FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
                          <FormField control={form.control} name={`anomalies.${index}.actionsCorrectives`} render={({ field }) => (
                             <FormItem><FormLabel>Actions correctives</FormLabel><FormControl><Textarea placeholder="Quelles actions correctives sont prévues ?" {...field} /></FormControl><FormMessage /></FormItem>
                         )} />
@@ -263,7 +276,7 @@ export default function NewChasseAuxAnomaliesPage() {
                         </Button>
                     </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ description: '', famille: '', avancement: 'En cours', actionsCorrectives: '', responsable: '', echeance: undefined })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ description: '', famille: '', criticite: 'Moyenne', avancement: 'En cours', actionsCorrectives: '', responsable: '', echeance: undefined })}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Ajouter une anomalie
                 </Button>
