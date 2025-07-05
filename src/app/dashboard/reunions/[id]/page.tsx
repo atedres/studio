@@ -103,8 +103,10 @@ export default function ReunionDetailPage() {
                         <p className="text-muted-foreground">Objet: {reunion.objet}</p>
                     </div>
                 </div>
-                 <Button>
-                    <Edit className="mr-2 h-4 w-4" /> Modifier
+                 <Button asChild>
+                    <Link href={`/dashboard/reunions/${reunion.id}/edit`}>
+                        <Edit className="mr-2 h-4 w-4" /> Modifier
+                    </Link>
                 </Button>
             </div>
             
