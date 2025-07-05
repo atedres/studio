@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -105,8 +106,10 @@ export default function FormTemplatesPage() {
                                 </p>
                             </CardContent>
                             <CardFooter>
-                                <Button className="w-full" disabled>
-                                    Utiliser ce modèle <ArrowRight className="ml-2 h-4 w-4"/>
+                                <Button asChild className="w-full">
+                                    <Link href={`/dashboard/templates/${template.id}`}>
+                                        Utiliser ce modèle <ArrowRight className="ml-2 h-4 w-4"/>
+                                    </Link>
                                 </Button>
                             </CardFooter>
                         </Card>
