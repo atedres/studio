@@ -1,3 +1,4 @@
+
 "use client"
 import React, { useState } from 'react'
 import { Button } from "@/components/ui/button"
@@ -18,6 +19,10 @@ import { Wand2, Loader2, ClipboardCheck, ArrowRight, Save } from "lucide-react"
 import { Separator } from '@/components/ui/separator'
 import { generateForm, FormGeneratorOutput } from '@/ai/flows/form-generator-flow'
 import { useToast } from "@/hooks/use-toast"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+import { useAuth } from '@/hooks/use-auth'
+
 
 // A component to render individual form fields based on the AI response
 const FormFieldRenderer: React.FC<{ field: FormGeneratorOutput['fields'][0] }> = ({ field }) => {
@@ -71,7 +76,10 @@ export default function FormBuilderPage() {
   const [topic, setTopic] = useState("Audit de sécurité pour travaux en hauteur")
   const [isGenerating, setIsGenerating] = useState(false)
   const [generatedForm, setGeneratedForm] = useState<FormGeneratorOutput | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const { toast } = useToast()
+  const { user } = useAuth()
+
 
   const handleGenerateForm = async () => {
     if (!topic) return
@@ -92,12 +100,38 @@ export default function FormBuilderPage() {
     }
   }
   
-  const handleSaveForm = () => {
-    console.log("Saving form structure:", generatedForm)
-    toast({
-      title: "Formulaire Enregistré",
-      description: "La structure de ce formulaire a été sauvegardée pour une utilisation future."
-    })
+  const handleSaveForm = async () => {
+    if (!generatedForm || !user) {
+        toast({
+            variant: "destructive",
+            title: "Erreur",
+            description: "Aucun formulaire généré ou utilisateur non connecté pour l'enregistrement.",
+        })
+        return
+    }
+    setIsSaving(true);
+    try {
+        await addDoc(collection(db, "formTemplates"), {
+            ...generatedForm,
+            topic: topic,
+            createdBy: user.uid,
+            userEmail: user.email,
+            createdAt: serverTimestamp(),
+        });
+        toast({
+          title: "Modèle Enregistré",
+          description: "La structure de ce formulaire a été sauvegardée avec succès.",
+        })
+    } catch (error) {
+        console.error("Error saving form template: ", error);
+        toast({
+            variant: "destructive",
+            title: "Erreur d'Enregistrement",
+            description: "Impossible de sauvegarder le modèle de formulaire. Veuillez réessayer.",
+        })
+    } finally {
+        setIsSaving(false);
+    }
   }
 
   return (
@@ -175,9 +209,9 @@ export default function FormBuilderPage() {
                 {generatedForm && !isGenerating && (
                   <CardFooter className="flex-col items-stretch gap-4">
                     <Separator/>
-                    <Button onClick={handleSaveForm}>
-                        <Save className="mr-2 h-4 w-4"/>
-                        Enregistrer ce modèle de formulaire
+                    <Button onClick={handleSaveForm} disabled={isSaving}>
+                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4"/>}
+                      Enregistrer ce modèle de formulaire
                     </Button>
                     <Button type="button" variant="secondary">Soumettre le formulaire rempli</Button>
                   </CardFooter>
