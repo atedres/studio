@@ -2,10 +2,12 @@
 'use client'
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import {
   Activity,
   AlertOctagon,
   CheckSquare,
+  Eye,
   Grab,
   Users,
 } from "lucide-react"
@@ -39,6 +41,7 @@ import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 
 // Interfaces for our Firestore data
 interface Anomaly {
@@ -79,6 +82,8 @@ interface DashboardData {
 
 interface Task extends Anomaly {
     taskId: string;
+    docId: string;
+    docType: 'audit' | 'anomaly';
     docSource: string;
 }
 
@@ -176,15 +181,27 @@ export default function DashboardPage() {
         }));
 
         // 6. User tasks
-        const userDialoguesTasks = dialogues.flatMap(d => 
+        const userDialoguesTasks: Task[] = dialogues.flatMap(d => 
             d.anomalies
-             .map((a, i) => ({ ...a, taskId: `${d.id}-${i}`, docSource: `DS ${d.id.substring(0,4)}...` }))
+             .map((a, i) => ({
+                ...a,
+                taskId: `${d.id}-${i}`,
+                docId: d.id,
+                docType: 'audit' as const,
+                docSource: `DS ${d.id.substring(0,4)}...`
+             }))
              .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.statut !== 'Réalisée')
         );
 
-        const userCaasTasks = caas.flatMap(c => 
+        const userCaasTasks: Task[] = caas.flatMap(c => 
             c.anomalies
-             .map((a, i) => ({ ...a, taskId: `${c.id}-${i}`, docSource: `CAA ${c.id.substring(0,4)}...`}))
+             .map((a, i) => ({
+                ...a,
+                taskId: `${c.id}-${i}`,
+                docId: c.id,
+                docType: 'anomaly' as const,
+                docSource: `CAA ${c.id.substring(0,4)}...`
+             }))
              .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.avancement !== 'Réalisée')
         );
         
@@ -314,6 +331,7 @@ export default function DashboardPage() {
                         <TableHead>Date</TableHead>
                         <TableHead>Zone</TableHead>
                         <TableHead>Statut</TableHead>
+                        <TableHead><span className="sr-only">Actions</span></TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -324,6 +342,7 @@ export default function DashboardPage() {
                           <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                           <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                           <TableCell><Skeleton className="h-6 w-24" /></TableCell>
+                          <TableCell><Skeleton className="h-10 w-10" /></TableCell>
                         </TableRow>
                       ))
                     ) : (
@@ -337,11 +356,19 @@ export default function DashboardPage() {
                                     {incident.status}
                                 </Badge>
                             </TableCell>
+                            <TableCell className="text-right">
+                                <Button asChild variant="outline" size="icon">
+                                    <Link href={`/dashboard/anomalies/${incident.id}`}>
+                                        <Eye className="h-4 w-4" />
+                                        <span className="sr-only">Voir</span>
+                                    </Link>
+                                </Button>
+                            </TableCell>
                         </TableRow>
                     )))}
                     {!loading && data?.incidentsRecents.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={4} className="text-center text-muted-foreground">Aucune Chasse aux Anomalies récente.</TableCell>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground">Aucune Chasse aux Anomalies récente.</TableCell>
                       </TableRow>
                     )}
                 </TableBody>
@@ -367,12 +394,14 @@ export default function DashboardPage() {
                     ))
                 ) : myTasks.length > 0 ? (
                     myTasks.map((task) => (
-                        <div key={task.taskId} className="flex items-center space-x-2">
+                        <div key={task.taskId} className="flex items-center space-x-2 group">
                             <Checkbox id={task.taskId} />
-                            <Label htmlFor={task.taskId} className="flex-1 font-normal">
-                                {task.description}
-                                <span className="ml-2 text-xs text-muted-foreground">({task.docSource})</span>
-                            </Label>
+                             <Link href={task.docType === 'audit' ? `/dashboard/audits/${task.docId}` : `/dashboard/anomalies/${task.docId}`} className="flex-1 cursor-pointer">
+                                <Label htmlFor={task.taskId} className="flex-1 font-normal cursor-pointer group-hover:underline">
+                                    {task.description}
+                                    <span className="ml-2 text-xs text-muted-foreground">({task.docSource})</span>
+                                </Label>
+                            </Link>
                         </div>
                     ))
                 ) : (

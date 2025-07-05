@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Edit, User, CalendarDays, MapPin, ClipboardList, AlertTriangle, ChevronsRight, Milestone } from 'lucide-react';
+import { ArrowLeft, Edit, User, Users, CalendarDays, MapPin, ClipboardList, AlertTriangle, ChevronsRight, Milestone } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
