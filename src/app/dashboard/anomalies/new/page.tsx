@@ -3,6 +3,7 @@
 
 import React from 'react'
 import Link from 'next/link'
+import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useFieldArray, useForm } from "react-hook-form"
 import * as z from "zod"
@@ -18,7 +19,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft } from "lucide-react"
+import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2 } from "lucide-react"
+import { db } from "@/lib/firebase"
+import { collection, addDoc, serverTimestamp } from "firebase/firestore"
+
 
 const chasseAuxAnomaliesSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -31,12 +35,12 @@ const chasseAuxAnomaliesSchema = z.object({
   anomalies: z.array(z.object({
     description: z.string().min(1, "La description est requise."),
     famille: z.string().min(1, "La famille de risque est requise."),
-    actionsCorrectives: z.string().optional(),
-    responsable: z.string().optional(),
+    actionsCorrectives: z.string().optional().default(''),
+    responsable: z.string().optional().default(''),
     echeance: z.date().optional(),
     avancement: z.enum(["En cours", "Réalisée", "Non réalisée"], { required_error: "Le statut d'avancement est requis." }),
   })).min(1, "Au moins une anomalie doit être signalée."),
-  commentaires: z.string().optional(),
+  commentaires: z.string().optional().default(''),
 })
 
 type ChasseAuxAnomaliesFormValues = z.infer<typeof chasseAuxAnomaliesSchema>
@@ -47,6 +51,8 @@ const statutsAvancement = ["En cours", "Réalisée", "Non réalisée"];
 export default function NewChasseAuxAnomaliesPage() {
   const { toast } = useToast()
   const { user } = useAuth()
+  const router = useRouter()
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const form = useForm<ChasseAuxAnomaliesFormValues>({
     resolver: zodResolver(chasseAuxAnomaliesSchema),
@@ -64,12 +70,39 @@ export default function NewChasseAuxAnomaliesPage() {
     control: form.control,
   })
 
-  function onSubmit(data: ChasseAuxAnomaliesFormValues) {
-    console.log(data)
-    toast({
-      title: "Formulaire Soumis",
-      description: "La Chasse Aux Anomalies (CAA) a été enregistrée.",
-    })
+  async function onSubmit(data: ChasseAuxAnomaliesFormValues) {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Erreur d'authentification",
+            description: "Vous devez être connecté pour soumettre un formulaire.",
+        })
+        return
+    }
+    setIsSubmitting(true)
+    try {
+      await addDoc(collection(db, "chassesAuxAnomalies"), {
+        ...data,
+        createdBy: user.uid,
+        userEmail: user.email,
+        createdAt: serverTimestamp(),
+        status: "Ouverte", // Initial status
+      });
+      toast({
+        title: "Formulaire Soumis",
+        description: "La Chasse Aux Anomalies (CAA) a été enregistrée.",
+      })
+      router.push('/dashboard/anomalies')
+    } catch (error) {
+      console.error("Error adding document: ", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible d'enregistrer le formulaire. Veuillez réessayer.",
+      })
+    } finally {
+        setIsSubmitting(false)
+    }
   }
   
   function onSaveDraft(data: ChasseAuxAnomaliesFormValues) {
@@ -224,7 +257,8 @@ export default function NewChasseAuxAnomaliesPage() {
             <Button type="button" variant="secondary" onClick={() => onSaveDraft(form.getValues())}>
               Enregistrer le brouillon
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90">
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
+               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Soumettre pour validation
             </Button>
           </div>

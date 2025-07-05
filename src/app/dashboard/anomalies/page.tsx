@@ -1,6 +1,8 @@
 
 "use client"
 
+import React, { useState, useEffect } from "react"
+import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,9 +20,24 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
 import { FilePlus2, ArrowUp, TrendingUp, UserCheck } from "lucide-react"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
-import Link from "next/link"
+import { db } from "@/lib/firebase"
+import { collection, getDocs, query, orderBy } from "firebase/firestore"
+
+interface CAA {
+    id: string;
+    date: {
+        seconds: number;
+        nanoseconds: number;
+    };
+    zone: string;
+    animateur: string;
+    anomalies: any[];
+    status: string;
+}
+
 
 const anomaliesByMonth = [
     { name: "Jan", "Anomalies": 30 },
@@ -31,14 +48,32 @@ const anomaliesByMonth = [
     { name: "Juin", "Anomalies": 45 },
 ]
 
-const recentCAAs = [
-    { id: "CAA-2407-015", date: "2024-07-22", zone: "Atelier de production", animateur: "Nadia Kettani", anomalies: 3, status: "Actions en cours" },
-    { id: "CAA-2407-014", date: "2024-07-21", zone: "Zone de stockage", animateur: "Ahmed Bennani", anomalies: 1, status: "Clôturée" },
-    { id: "CAA-2407-013", date: "2024-07-20", zone: "Magasin", animateur: "Said Tazi", anomalies: 5, status: "Clôturée" },
-    { id: "CAA-2407-012", date: "2024-07-19", zone: "Ligne 2", animateur: "Leila Alami", anomalies: 2, status: "Ouverte" },
-]
-
 export default function AnomaliesPage() {
+    const [caas, setCaas] = useState<CAA[]>([])
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const fetchCAAs = async () => {
+            setLoading(true);
+            try {
+                const q = query(collection(db, "chassesAuxAnomalies"), orderBy("date", "desc"));
+                const querySnapshot = await getDocs(q);
+                const caasData = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                })) as CAA[];
+                setCaas(caasData);
+            } catch (error) {
+                console.error("Error fetching CAAs: ", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchCAAs();
+    }, []);
+
+
     const getStatusVariant = (status: string) => {
         switch (status) {
           case "Clôturée":
@@ -50,7 +85,20 @@ export default function AnomaliesPage() {
           default:
             return "secondary"
         }
-      }
+    }
+    
+  const renderSkeleton = () => (
+    [...Array(4)].map((_, i) => (
+      <TableRow key={i}>
+        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-40" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+        <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+      </TableRow>
+    ))
+  )
 
   return (
     <div className="space-y-6">
@@ -127,13 +175,13 @@ export default function AnomaliesPage() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {recentCAAs.map((caa) => (
+                    {loading ? renderSkeleton() : caas.map((caa) => (
                         <TableRow key={caa.id}>
-                            <TableCell className="font-medium">{caa.id}</TableCell>
-                            <TableCell>{caa.date}</TableCell>
+                            <TableCell className="font-medium">{caa.id.substring(0,8)}...</TableCell>
+                            <TableCell>{new Date(caa.date.seconds * 1000).toLocaleDateString('fr-FR')}</TableCell>
                             <TableCell>{caa.zone}</TableCell>
                             <TableCell>{caa.animateur}</TableCell>
-                            <TableCell className="text-center">{caa.anomalies}</TableCell>
+                            <TableCell className="text-center">{caa.anomalies.length}</TableCell>
                             <TableCell><Badge variant={getStatusVariant(caa.status) as any}>{caa.status}</Badge></TableCell>
                         </TableRow>
                     ))}
