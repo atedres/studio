@@ -14,6 +14,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -35,6 +36,8 @@ const reunionSchema = z.object({
   duree: z.string().min(1, "La durée est requise."),
   collaborateurs: z.string().min(1, "Les collaborateurs sont requis."),
   support: z.any().optional(), // File upload
+  status: z.enum(["Planifiée", "Réalisée", "Annulée"], { required_error: "Le statut est requis." }),
+  compteRendu: z.string().optional().default(''),
 })
 
 type ReunionFormValues = z.infer<typeof reunionSchema>
@@ -262,6 +265,33 @@ export default function EditReunionPage() {
                         <FormMessage />
                     </FormItem>
                  )} />
+                 <FormField control={form.control} name="status" render={({ field }) => (
+                    <FormItem><FormLabel>Statut de la réunion</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner un statut..." /></SelectTrigger></FormControl>
+                        <SelectContent>
+                            <SelectItem value="Planifiée">Planifiée</SelectItem>
+                            <SelectItem value="Réalisée">Réalisée</SelectItem>
+                            <SelectItem value="Annulée">Annulée</SelectItem>
+                        </SelectContent>
+                        </Select><FormMessage />
+                    </FormItem>
+                 )} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+                <CardTitle>Compte Rendu</CardTitle>
+                <CardDescription>Rédigez ici le compte rendu de la réunion, les décisions prises et les points d'action.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <FormField control={form.control} name="compteRendu" render={({ field }) => (
+                    <FormItem>
+                        <FormControl><Textarea placeholder="Commencez à rédiger..." rows={10} {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                )} />
             </CardContent>
           </Card>
 

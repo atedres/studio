@@ -39,6 +39,7 @@ interface ReunionDetails {
   collaborateurs: string;
   supportUrl: string;
   status: string;
+  compteRendu?: string;
 }
 
 
@@ -91,6 +92,19 @@ export default function ReunionDetailPage() {
             setIsDeleting(false);
         }
     }
+    
+    const getStatusVariant = (status: string) => {
+        switch (status) {
+        case "Réalisée":
+            return "default"
+        case "Annulée":
+            return "destructive"
+        case "Planifiée":
+            return "outline"
+        default:
+            return "secondary"
+        }
+    }
 
     if (loading) {
         return (
@@ -134,7 +148,10 @@ export default function ReunionDetailPage() {
                         <ArrowLeft className="h-4 w-4" />
                      </Button>
                     <div>
-                        <h1 className="text-3xl font-bold tracking-tight font-headline">Détail de la Réunion</h1>
+                        <div className="flex items-center gap-4">
+                            <h1 className="text-3xl font-bold tracking-tight font-headline">Détail de la Réunion</h1>
+                            <Badge variant={getStatusVariant(reunion.status) as any} className="text-base">{reunion.status}</Badge>
+                        </div>
                         <p className="text-muted-foreground">Objet: {reunion.objet}</p>
                     </div>
                 </div>
@@ -235,6 +252,15 @@ export default function ReunionDetailPage() {
                         </CardContent>
                     </Card>
                 </div>
+                
+                <Card className="lg:col-span-3">
+                    <CardHeader>
+                        <CardTitle>Compte Rendu</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">{reunion.compteRendu || "Aucun compte rendu n'a encore été rédigé."}</p>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );
