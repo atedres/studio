@@ -38,12 +38,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Interfaces for our Firestore data
 interface Anomaly {
@@ -87,6 +86,7 @@ interface Task extends Anomaly {
     docId: string;
     docType: 'audit' | 'anomaly';
     docSource: string;
+    status: string;
 }
 
 const CHART_COLORS = [
@@ -191,9 +191,10 @@ export default function DashboardPage() {
                 taskId: `${d.id}-${i}`,
                 docId: d.id,
                 docType: 'audit' as const,
-                docSource: `DS ${d.id.substring(0,4)}...`
+                docSource: `DS ${d.id.substring(0,4)}...`,
+                status: a.statut || 'Non défini'
              }))
-             .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.statut !== 'Réalisée')
+             .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.status !== 'Réalisée')
         );
 
         const userCaasTasks: Task[] = caas.flatMap(c => 
@@ -203,9 +204,10 @@ export default function DashboardPage() {
                 taskId: `${c.id}-${i}`,
                 docId: c.id,
                 docType: 'anomaly' as const,
-                docSource: `CAA ${c.id.substring(0,4)}...`
+                docSource: `CAA ${c.id.substring(0,4)}...`,
+                status: a.avancement || 'Non défini'
              }))
-             .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.avancement !== 'Réalisée')
+             .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.status !== 'Réalisée')
         );
         
         setMyTasks([...userDialoguesTasks, ...userCaasTasks]);
@@ -238,7 +240,7 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
-  const handleTaskCompletion = async (task: Task) => {
+  const handleTaskStatusChange = async (task: Task, newStatus: string) => {
     setUpdatingTasks(prev => [...prev, task.taskId]);
     const collectionName = task.docType === 'audit' ? 'dialoguesSecurite' : 'chassesAuxAnomalies';
     const docRef = doc(db, collectionName, task.docId);
@@ -255,33 +257,39 @@ export default function DashboardPage() {
         }
 
         const updatedAnomalies = [...data.anomalies];
-        const currentTask = updatedAnomalies[taskIndex];
+        const currentTaskInDb = updatedAnomalies[taskIndex];
 
         if (task.docType === 'audit') {
-            currentTask.statut = 'Réalisée';
+            currentTaskInDb.statut = newStatus;
         } else {
-            currentTask.avancement = 'Réalisée';
+            currentTaskInDb.avancement = newStatus;
         }
 
         await updateDoc(docRef, { anomalies: updatedAnomalies });
 
-        setMyTasks(prevTasks => prevTasks.filter(t => t.taskId !== task.taskId));
-        
-        // Optimistic update for "Actions en retard" counter
-        if (currentTask.echeance && new Date(currentTask.echeance.seconds * 1000) < new Date()) {
-          setData(prevData => prevData ? {...prevData, actionsEnRetard: Math.max(0, prevData.actionsEnRetard - 1)} : null);
+        if (newStatus === 'Réalisée') {
+            setMyTasks(prevTasks => prevTasks.filter(t => t.taskId !== task.taskId));
+            // Optimistic update for "Actions en retard" counter
+            if (currentTaskInDb.echeance && new Date(currentTaskInDb.echeance.seconds * 1000) < new Date()) {
+                setData(prevData => prevData ? {...prevData, actionsEnRetard: Math.max(0, prevData.actionsEnRetard - 1)} : null);
+            }
+            toast({
+                title: "Tâche terminée !",
+                description: "L'action a été marquée comme réalisée.",
+            });
+        } else {
+             setMyTasks(prevTasks => prevTasks.map(t => t.taskId === task.taskId ? { ...t, status: newStatus } : t));
+             toast({
+                title: "Statut mis à jour",
+                description: `L'action est maintenant "${newStatus}".`,
+            });
         }
-
-        toast({
-            title: "Tâche terminée !",
-            description: "L'action a été marquée comme réalisée.",
-        });
     } catch (error) {
-        console.error("Error updating task: ", error);
+        console.error("Error updating task status: ", error);
         toast({
             variant: "destructive",
             title: "Erreur",
-            description: "Impossible de mettre à jour la tâche.",
+            description: "Impossible de mettre à jour le statut de la tâche.",
         });
     } finally {
         setUpdatingTasks(prev => prev.filter(id => id !== task.taskId));
@@ -457,21 +465,35 @@ export default function DashboardPage() {
                     ))
                 ) : myTasks.length > 0 ? (
                     myTasks.map((task) => (
-                        <div key={task.taskId} className="flex items-center space-x-2 group">
-                             {updatingTasks.includes(task.taskId) ? (
-                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <div key={task.taskId} className="flex items-center justify-between gap-2">
+                            {updatingTasks.includes(task.taskId) ? (
+                                <div className="flex items-center gap-2 flex-1">
+                                    <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                                    <span className="text-sm text-muted-foreground">Mise à jour...</span>
+                                </div>
                             ) : (
-                                <Checkbox
-                                    id={task.taskId}
-                                    onCheckedChange={() => handleTaskCompletion(task)}
-                                />
+                                <>
+                                    <Link href={task.docType === 'audit' ? `/dashboard/audits/${task.docId}` : `/dashboard/anomalies/${task.docId}`} className="flex-1 cursor-pointer group">
+                                        <p className="text-sm font-normal group-hover:underline">
+                                            {task.description}
+                                            <span className="ml-2 text-xs text-muted-foreground">({task.docSource})</span>
+                                        </p>
+                                    </Link>
+                                    <Select
+                                        value={task.status}
+                                        onValueChange={(newStatus) => handleTaskStatusChange(task, newStatus)}
+                                    >
+                                        <SelectTrigger className="w-[140px] h-8 text-xs">
+                                            <SelectValue placeholder="Changer statut" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="En cours">En cours</SelectItem>
+                                            <SelectItem value="Non réalisée">Non réalisée</SelectItem>
+                                            <SelectItem value="Réalisée">Réalisée</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </>
                             )}
-                             <Link href={task.docType === 'audit' ? `/dashboard/audits/${task.docId}` : `/dashboard/anomalies/${task.docId}`} className="flex-1 cursor-pointer">
-                                <Label htmlFor={task.taskId} className="flex-1 font-normal cursor-pointer group-hover:underline">
-                                    {task.description}
-                                    <span className="ml-2 text-xs text-muted-foreground">({task.docSource})</span>
-                                </Label>
-                            </Link>
                         </div>
                     ))
                 ) : (
