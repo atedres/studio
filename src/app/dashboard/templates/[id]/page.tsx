@@ -4,12 +4,13 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { FormGeneratorOutput } from '@/ai/flows/form-generator-flow';
 import { Input } from '@/components/ui/input';
@@ -89,10 +90,12 @@ export default function FillTemplatePage() {
     const router = useRouter();
     const id = params.id as string;
     const { toast } = useToast();
+    const { user } = useAuth();
 
     const [template, setTemplate] = useState<FormGeneratorOutput | null>(null);
     const [formData, setFormData] = useState<Record<string, any>>({});
     const [loading, setLoading] = useState(true);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
         if (!id) return;
@@ -131,13 +134,41 @@ export default function FillTemplatePage() {
     
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // In a real app, this would save to a 'formSubmissions' collection
-        console.log("Form Data Submitted: ", formData);
-        toast({
-            title: "Soumission Reçue",
-            description: "Les données du formulaire ont été enregistrées dans la console.",
-        });
-        // Potentially clear form or redirect
+        if (!user || !template) {
+             toast({
+                variant: "destructive",
+                title: "Erreur",
+                description: "Impossible de soumettre le formulaire. Utilisateur ou modèle manquant.",
+            });
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            await addDoc(collection(db, 'formSubmissions'), {
+                templateId: id,
+                templateTitle: template.title,
+                submittedBy: user.uid,
+                userEmail: user.email,
+                submittedAt: serverTimestamp(),
+                formData: formData,
+            });
+
+            toast({
+                title: "Formulaire Soumis",
+                description: "Vos réponses ont été enregistrées avec succès.",
+            });
+            router.push('/dashboard');
+        } catch (error) {
+            console.error("Error submitting form data:", error);
+            toast({
+                variant: "destructive",
+                title: "Erreur de Soumission",
+                description: "Une erreur est survenue lors de l'enregistrement de vos réponses.",
+            });
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     if (loading) {
@@ -204,8 +235,12 @@ export default function FillTemplatePage() {
                         ))}
                     </CardContent>
                     <CardFooter>
-                        <Button type="submit">
-                            <Send className="mr-2 h-4 w-4" />
+                        <Button type="submit" disabled={isSubmitting}>
+                            {isSubmitting ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            ) : (
+                                <Send className="mr-2 h-4 w-4" />
+                            )}
                             Soumettre le formulaire
                         </Button>
                     </CardFooter>
