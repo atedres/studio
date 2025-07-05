@@ -1,3 +1,4 @@
+
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -8,7 +9,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { List, PlusCircle, Video, Users } from "lucide-react"
+import { PlusCircle, Video, Users } from "lucide-react"
+import Link from "next/link"
 
 const upcomingMeetings = [
     {
@@ -50,9 +52,11 @@ export default function ReunionsPage() {
                     <CardTitle>Réunions à venir</CardTitle>
                     <CardDescription>Liste des prochaines réunions planifiées.</CardDescription>
                 </div>
-                <Button className="bg-accent hover:bg-accent/90">
+                <Button asChild className="bg-accent hover:bg-accent/90">
+                  <Link href="/dashboard/reunions/new">
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    Planifier une réunion
+                    Programmer une réunion
+                  </Link>
                 </Button>
             </CardHeader>
             <CardContent className="space-y-4">

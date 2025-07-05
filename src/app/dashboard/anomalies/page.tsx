@@ -1,3 +1,4 @@
+
 "use client"
 
 import { Badge } from "@/components/ui/badge"
@@ -17,8 +18,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { FilePlus2, ArrowUp, ArrowDown, TrendingUp } from "lucide-react"
+import { FilePlus2, ArrowUp, TrendingUp, UserCheck } from "lucide-react"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
+import Link from "next/link"
 
 const anomaliesByMonth = [
     { name: "Jan", "Anomalies": 30 },
@@ -29,21 +31,21 @@ const anomaliesByMonth = [
     { name: "Juin", "Anomalies": 45 },
 ]
 
-const recentAnomalies = [
-    { id: "CAA-2407-015", date: "2024-07-22", reporter: "Nadia Kettani", type: "Comportement dangereux", status: "Action corrective ouverte" },
-    { id: "CAA-2407-014", date: "2024-07-21", reporter: "Ahmed Bennani", type: "Équipement défectueux", status: "Résolue" },
-    { id: "CAA-2407-013", date: "2024-07-20", reporter: "Said Tazi", type: "Défaut de rangement", status: "Résolue" },
-    { id: "CAA-2407-012", date: "2024-07-19", reporter: "Leila Alami", type: "Fuite d'huile", status: "En cours d'investigation" },
+const recentCAAs = [
+    { id: "CAA-2407-015", date: "2024-07-22", zone: "Atelier de production", animateur: "Nadia Kettani", anomalies: 3, status: "Actions en cours" },
+    { id: "CAA-2407-014", date: "2024-07-21", zone: "Zone de stockage", animateur: "Ahmed Bennani", anomalies: 1, status: "Clôturée" },
+    { id: "CAA-2407-013", date: "2024-07-20", zone: "Magasin", animateur: "Said Tazi", anomalies: 5, status: "Clôturée" },
+    { id: "CAA-2407-012", date: "2024-07-19", zone: "Ligne 2", animateur: "Leila Alami", anomalies: 2, status: "Ouverte" },
 ]
 
 export default function AnomaliesPage() {
     const getStatusVariant = (status: string) => {
         switch (status) {
-          case "Résolue":
+          case "Clôturée":
             return "default"
-          case "En cours d'investigation":
-            return "secondary"
-          case "Action corrective ouverte":
+          case "Ouverte":
+            return "destructive"
+          case "Actions en cours":
             return "outline"
           default:
             return "secondary"
@@ -96,12 +98,12 @@ export default function AnomaliesPage() {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Top Contributeur</CardTitle>
-             <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Top Animateur</CardTitle>
+             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Ahmed Bennani</div>
-            <p className="text-xs text-muted-foreground">Avec 7 remontées ce mois</p>
+            <div className="text-2xl font-bold">Nadia Kettani</div>
+            <p className="text-xs text-muted-foreground">Avec 4 CAA ce mois</p>
           </CardContent>
         </Card>
       </div>
@@ -109,8 +111,8 @@ export default function AnomaliesPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-full lg:col-span-4">
             <CardHeader>
-                <CardTitle>Rapports d'Anomalies Récents</CardTitle>
-                <CardDescription>Liste des dernières remontées terrain.</CardDescription>
+                <CardTitle>Rapports de Chasse aux Anomalies Récents</CardTitle>
+                <CardDescription>Liste des dernières CAA réalisées.</CardDescription>
             </CardHeader>
             <CardContent>
             <Table>
@@ -118,19 +120,21 @@ export default function AnomaliesPage() {
                     <TableRow>
                         <TableHead>ID CAA</TableHead>
                         <TableHead>Date</TableHead>
-                        <TableHead>Signalé par</TableHead>
-                        <TableHead>Type</TableHead>
+                        <TableHead>Zone</TableHead>
+                        <TableHead>Animateur</TableHead>
+                        <TableHead>Nb. Anomalies</TableHead>
                         <TableHead>Statut</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {recentAnomalies.map((anomaly) => (
-                        <TableRow key={anomaly.id}>
-                            <TableCell className="font-medium">{anomaly.id}</TableCell>
-                            <TableCell>{anomaly.date}</TableCell>
-                            <TableCell>{anomaly.reporter}</TableCell>
-                            <TableCell>{anomaly.type}</TableCell>
-                            <TableCell><Badge variant={getStatusVariant(anomaly.status) as any}>{anomaly.status}</Badge></TableCell>
+                    {recentCAAs.map((caa) => (
+                        <TableRow key={caa.id}>
+                            <TableCell className="font-medium">{caa.id}</TableCell>
+                            <TableCell>{caa.date}</TableCell>
+                            <TableCell>{caa.zone}</TableCell>
+                            <TableCell>{caa.animateur}</TableCell>
+                            <TableCell className="text-center">{caa.anomalies}</TableCell>
+                            <TableCell><Badge variant={getStatusVariant(caa.status) as any}>{caa.status}</Badge></TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
@@ -155,9 +159,11 @@ export default function AnomaliesPage() {
         </Card>
       </div>
         <div className="fixed bottom-8 right-8">
-            <Button size="lg" className="rounded-full h-16 w-16 shadow-lg bg-accent hover:bg-accent/90">
-                <FilePlus2 className="h-8 w-8" />
-                <span className="sr-only">Nouvelle Anomalie</span>
+            <Button asChild size="lg" className="rounded-full h-16 w-16 shadow-lg bg-accent hover:bg-accent/90">
+                <Link href="/dashboard/anomalies/new">
+                    <FilePlus2 className="h-8 w-8" />
+                    <span className="sr-only">Ajouter une CAA</span>
+                </Link>
             </Button>
         </div>
     </div>
