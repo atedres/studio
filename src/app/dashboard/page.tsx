@@ -9,6 +9,7 @@ import {
   CheckSquare,
   Eye,
   Grab,
+  Loader2,
   Users,
 } from "lucide-react"
 import {
@@ -25,9 +26,10 @@ import {
   Cell
 } from "recharts"
 import { db } from "@/lib/firebase"
-import { collection, getDocs } from "firebase/firestore"
+import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore"
 import { subMonths, format, startOfMonth } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
+import { useToast } from "@/hooks/use-toast"
 
 import {
   Card,
@@ -100,9 +102,10 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const [myTasks, setMyTasks] = useState<Task[]>([]);
+  const { toast } = useToast();
+  const [updatingTasks, setUpdatingTasks] = useState<string[]>([]);
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = async () => {
       if (!user) { // Don't fetch if user is not loaded
           setLoading(false);
           return;
@@ -218,12 +221,72 @@ export default function DashboardPage() {
 
       } catch (error) {
         console.error("Error fetching dashboard data:", error);
+         toast({
+          variant: "destructive",
+          title: "Erreur de chargement",
+          description: "Impossible de récupérer les données du tableau de bord.",
+        })
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
+  
+  useEffect(() => {
+    if (user) {
+      fetchData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  const handleTaskCompletion = async (task: Task) => {
+    setUpdatingTasks(prev => [...prev, task.taskId]);
+    const collectionName = task.docType === 'audit' ? 'dialoguesSecurite' : 'chassesAuxAnomalies';
+    const docRef = doc(db, collectionName, task.docId);
+
+    try {
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) throw new Error("Document non trouvé.");
+
+        const data = docSnap.data();
+        const taskIndex = parseInt(task.taskId.split('-').pop()!, 10);
+        
+        if (isNaN(taskIndex) || !data.anomalies || !data.anomalies[taskIndex]) {
+             throw new Error("Tâche non trouvée dans le document.");
+        }
+
+        const updatedAnomalies = [...data.anomalies];
+        const currentTask = updatedAnomalies[taskIndex];
+
+        if (task.docType === 'audit') {
+            currentTask.statut = 'Réalisée';
+        } else {
+            currentTask.avancement = 'Réalisée';
+        }
+
+        await updateDoc(docRef, { anomalies: updatedAnomalies });
+
+        setMyTasks(prevTasks => prevTasks.filter(t => t.taskId !== task.taskId));
+        
+        // Optimistic update for "Actions en retard" counter
+        if (currentTask.echeance && new Date(currentTask.echeance.seconds * 1000) < new Date()) {
+          setData(prevData => prevData ? {...prevData, actionsEnRetard: Math.max(0, prevData.actionsEnRetard - 1)} : null);
+        }
+
+        toast({
+            title: "Tâche terminée !",
+            description: "L'action a été marquée comme réalisée.",
+        });
+    } catch (error) {
+        console.error("Error updating task: ", error);
+        toast({
+            variant: "destructive",
+            title: "Erreur",
+            description: "Impossible de mettre à jour la tâche.",
+        });
+    } finally {
+        setUpdatingTasks(prev => prev.filter(id => id !== task.taskId));
+    }
+};
 
   return (
     <div className="flex-1 space-y-4">
@@ -395,7 +458,14 @@ export default function DashboardPage() {
                 ) : myTasks.length > 0 ? (
                     myTasks.map((task) => (
                         <div key={task.taskId} className="flex items-center space-x-2 group">
-                            <Checkbox id={task.taskId} />
+                             {updatingTasks.includes(task.taskId) ? (
+                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                            ) : (
+                                <Checkbox
+                                    id={task.taskId}
+                                    onCheckedChange={() => handleTaskCompletion(task)}
+                                />
+                            )}
                              <Link href={task.docType === 'audit' ? `/dashboard/audits/${task.docId}` : `/dashboard/anomalies/${task.docId}`} className="flex-1 cursor-pointer">
                                 <Label htmlFor={task.taskId} className="flex-1 font-normal cursor-pointer group-hover:underline">
                                     {task.description}
