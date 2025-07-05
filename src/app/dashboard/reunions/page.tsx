@@ -20,10 +20,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { PlusCircle, Eye } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { PlusCircle, Eye, CalendarCheck, Users, TrendingUp } from "lucide-react"
+import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, query, orderBy } from "firebase/firestore"
+import { startOfMonth, subMonths, format } from 'date-fns'
 
 interface Reunion {
     id: string;
@@ -34,8 +36,16 @@ interface Reunion {
     status: string;
 }
 
+interface ReunionStats {
+    reunionsCeMois: number;
+    reunionsPlanifiees: number;
+    topAnimateur: { name: string; count: number };
+    reunionsParMois: { name: string; "Réunions": number }[];
+}
+
 export default function ReunionsPage() {
   const [reunions, setReunions] = useState<Reunion[]>([])
+  const [stats, setStats] = useState<ReunionStats | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -49,12 +59,56 @@ export default function ReunionsPage() {
                 ...doc.data()
             })) as Reunion[];
             setReunions(reunionsData);
+            calculateStats(reunionsData);
         } catch (error) {
             console.error("Error fetching meetings: ", error);
         } finally {
             setLoading(false);
         }
     };
+
+    const calculateStats = (data: Reunion[]) => {
+        const now = new Date();
+        const debutMois = startOfMonth(now);
+        
+        const reunionsCeMois = data.filter(r => new Date(r.date.seconds * 1000) >= debutMois).length;
+        const reunionsPlanifiees = data.filter(r => r.status === 'Planifiée').length;
+        
+        const animateurCounts = data.reduce((acc, reunion) => {
+            acc[reunion.animateur] = (acc[reunion.animateur] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
+        const topAnimateur = Object.entries(animateurCounts).reduce((top, [name, count]) => {
+            return count > top.count ? { name, count } : top;
+        }, { name: 'N/A', count: 0 });
+
+        const reunionsParMoisMap = new Map<string, number>();
+         for (let i = 5; i >= 0; i--) {
+            const d = subMonths(now, i);
+            const monthName = format(d, 'MMM');
+            reunionsParMoisMap.set(monthName, 0);
+        }
+        data.forEach(reunion => {
+            const date = new Date(reunion.date.seconds * 1000);
+             const monthName = format(date, 'MMM');
+            if (reunionsParMoisMap.has(monthName)) {
+               reunionsParMoisMap.set(monthName, (reunionsParMoisMap.get(monthName) || 0) + 1);
+            }
+        });
+
+        const reunionsParMois = Array.from(reunionsParMoisMap.entries()).map(([name, count]) => ({
+            name,
+            "Réunions": count,
+        }));
+
+        setStats({
+            reunionsCeMois,
+            reunionsPlanifiees,
+            topAnimateur,
+            reunionsParMois,
+        });
+    }
 
     fetchReunions();
   }, []);
@@ -93,62 +147,116 @@ export default function ReunionsPage() {
           Planification, suivi et reporting des réunions et comités SST.
         </p>
       </div>
-      <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                  <CardTitle>Historique des Réunions</CardTitle>
-                  <CardDescription>Liste de toutes les réunions planifiées et passées.</CardDescription>
-              </div>
-              <Button asChild className="bg-accent hover:bg-accent/90">
-                <Link href="/dashboard/reunions/new">
-                  <PlusCircle className="mr-2 h-4 w-4" />
-                  Programmer une réunion
-                </Link>
-              </Button>
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Réunions ce Mois-ci</CardTitle>
+            <CalendarCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-             <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Objet</TableHead>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Heure</TableHead>
-                        <TableHead>Animateur</TableHead>
-                        <TableHead>Statut</TableHead>
-                        <TableHead><span className="sr-only">Actions</span></TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {loading ? renderSkeleton() : reunions.map((reunion) => (
-                        <TableRow key={reunion.id}>
-                            <TableCell className="font-medium">{reunion.objet}</TableCell>
-                            <TableCell>{new Date(reunion.date.seconds * 1000).toLocaleDateString('fr-FR')}</TableCell>
-                            <TableCell>{reunion.heure}</TableCell>
-                            <TableCell>{reunion.animateur}</TableCell>
-                            <TableCell>
-                                <Badge variant={getStatusVariant(reunion.status) as any}>{reunion.status}</Badge>
-                            </TableCell>
-                            <TableCell className="text-right">
-                                <Button asChild variant="outline" size="icon">
-                                    <Link href={`/dashboard/reunions/${reunion.id}`}>
-                                        <Eye className="h-4 w-4" />
-                                        <span className="sr-only">Voir</span>
-                                    </Link>
-                                </Button>
-                            </TableCell>
-                        </TableRow>
-                    ))}
-                     {!loading && reunions.length === 0 && (
-                        <TableRow>
-                            <TableCell colSpan={6} className="h-24 text-center">
-                            Aucune réunion trouvée.
-                            </TableCell>
-                        </TableRow>
-                    )}
-                </TableBody>
-            </Table>
+             {loading ? <Skeleton className="h-7 w-12" /> : <div className="text-2xl font-bold">{stats?.reunionsCeMois}</div>}
+             <p className="text-xs text-muted-foreground">Depuis le début du mois</p>
           </CardContent>
-      </Card>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Réunions à Venir</CardTitle>
+             <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loading ? <Skeleton className="h-7 w-16" /> : <div className="text-2xl font-bold">{stats?.reunionsPlanifiees}</div>}
+            <p className="text-xs text-muted-foreground">Statut "Planifiée"</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Top Animateur</CardTitle>
+             <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loading ? <Skeleton className="h-7 w-32" /> : <div className="text-2xl font-bold">{stats?.topAnimateur.name}</div>}
+            {loading ? <Skeleton className="h-4 w-24 mt-1" /> : <p className="text-xs text-muted-foreground">Avec {stats?.topAnimateur.count} réunions</p>}
+          </CardContent>
+        </Card>
+      </div>
+      
+       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+          <Card className="col-span-full lg:col-span-4">
+              <CardHeader className="flex flex-row items-center justify-between">
+                  <div>
+                      <CardTitle>Historique des Réunions</CardTitle>
+                      <CardDescription>Liste de toutes les réunions planifiées et passées.</CardDescription>
+                  </div>
+                  <Button asChild className="bg-accent hover:bg-accent/90">
+                    <Link href="/dashboard/reunions/new">
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Programmer une réunion
+                    </Link>
+                  </Button>
+              </CardHeader>
+              <CardContent>
+                 <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Objet</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Heure</TableHead>
+                            <TableHead>Animateur</TableHead>
+                            <TableHead>Statut</TableHead>
+                            <TableHead><span className="sr-only">Actions</span></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {loading ? renderSkeleton() : reunions.map((reunion) => (
+                            <TableRow key={reunion.id}>
+                                <TableCell className="font-medium">{reunion.objet}</TableCell>
+                                <TableCell>{new Date(reunion.date.seconds * 1000).toLocaleDateString('fr-FR')}</TableCell>
+                                <TableCell>{reunion.heure}</TableCell>
+                                <TableCell>{reunion.animateur}</TableCell>
+                                <TableCell>
+                                    <Badge variant={getStatusVariant(reunion.status) as any}>{reunion.status}</Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                    <Button asChild variant="outline" size="icon">
+                                        <Link href={`/dashboard/reunions/${reunion.id}`}>
+                                            <Eye className="h-4 w-4" />
+                                            <span className="sr-only">Voir</span>
+                                        </Link>
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                         {!loading && reunions.length === 0 && (
+                            <TableRow>
+                                <TableCell colSpan={6} className="h-24 text-center">
+                                Aucune réunion trouvée.
+                                </TableCell>
+                            </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+              </CardContent>
+          </Card>
+           <Card className="col-span-full lg:col-span-3 min-w-0">
+                <CardHeader>
+                    <CardTitle>Réunions par Mois</CardTitle>
+                    <CardDescription>Nombre de réunions tenues au cours des 6 derniers mois.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    {loading || !stats ? <Skeleton className="w-full h-[300px]" /> :
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={stats.reunionsParMois}>
+                                <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                                <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                                <Tooltip />
+                                <Bar dataKey="Réunions" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    }
+                </CardContent>
+            </Card>
+      </div>
     </div>
   )
 }
