@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useEffect, useState } from 'react';
@@ -8,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, User, CalendarDays } from 'lucide-react';
+import { ArrowLeft, User, CalendarDays, Download } from 'lucide-react';
 import { format } from "date-fns"
 import { fr } from 'date-fns/locale'
 import type { FormGeneratorOutput } from '@/ai/flows/form-generator-flow';
@@ -29,10 +30,15 @@ interface Submission {
 }
 
 const ReadOnlyFieldRenderer: React.FC<{ field: FormField; value: any }> = ({ field, value }) => {
-    if (value === undefined || value === null || value === '') {
-        value = <span className="text-muted-foreground italic">Non renseigné</span>;
-    }
+    const emptyValue = <span className="text-muted-foreground italic">Non renseigné</span>;
 
+    const renderValue = (val: any) => {
+        if (val === undefined || val === null || val === '') {
+            return emptyValue;
+        }
+        return val;
+    }
+    
     switch (field.type) {
         case 'title':
             return <h3 className="font-semibold text-lg pt-4 text-primary">{field.label}</h3>;
@@ -45,7 +51,7 @@ const ReadOnlyFieldRenderer: React.FC<{ field: FormField; value: any }> = ({ fie
             return (
                 <div className="space-y-1.5">
                     <Label className="text-sm">{field.label}</Label>
-                    <p className="text-sm font-medium p-2 border rounded-md bg-muted/50 min-h-[40px] whitespace-pre-wrap">{value}</p>
+                    <p className="text-sm font-medium p-2 border rounded-md bg-muted/50 min-h-[40px] whitespace-pre-wrap">{renderValue(value)}</p>
                 </div>
             );
         case 'checkbox':
@@ -59,11 +65,22 @@ const ReadOnlyFieldRenderer: React.FC<{ field: FormField; value: any }> = ({ fie
             );
         case 'file':
              return (
-                 <div className="space-y-1.5">
-                    <Label className="text-sm">{field.label}</Label>
-                    <p className="text-sm font-medium p-2 border rounded-md bg-muted/50 min-h-[40px]">{value}</p>
-                </div>
-            );
+                <div className="space-y-1.5">
+                   <Label className="text-sm">{field.label}</Label>
+                   {typeof value === 'string' && value.startsWith('https://firebasestorage.googleapis.com') ? (
+                       <Button asChild variant="outline" className="w-full max-w-xs justify-start">
+                           <a href={value} target="_blank" rel="noopener noreferrer">
+                               <Download className="mr-2 h-4 w-4" />
+                               <span>Voir / Télécharger le fichier joint</span>
+                           </a>
+                       </Button>
+                   ) : (
+                       <p className="text-sm font-medium p-2 border rounded-md bg-muted/50 min-h-[40px]">
+                           {emptyValue}
+                       </p>
+                   )}
+               </div>
+           );
         default:
             return null;
     }

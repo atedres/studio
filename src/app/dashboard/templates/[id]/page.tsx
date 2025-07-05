@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { doc, getDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 type FormField = FormGeneratorOutput['fields'][0];
 
@@ -76,8 +77,7 @@ const FormFieldRenderer: React.FC<{
              return (
                 <div className="space-y-2">
                     <Label htmlFor={field.id}>{field.label}</Label>
-                    <Input id={field.id} type="file" />
-                    <p className="text-xs text-muted-foreground">Le téléversement de fichier n'est pas encore actif pour ce formulaire.</p>
+                    <Input id={field.id} type="file" onChange={(e) => onChange(field.id, e.target.files ? e.target.files[0] : null)} />
                 </div>
             );
         default:
@@ -145,20 +145,48 @@ export default function FillTemplatePage() {
 
         setIsSubmitting(true);
         try {
+            const dataToSubmit = { ...formData };
+            const fileUploadPromises: Promise<void>[] = [];
+
+            // Iterate over the template fields to find file inputs
+            for (const field of template.fields) {
+                // Check if the field is a file input and if a file has been selected
+                if (field.type === 'file' && dataToSubmit[field.id] instanceof File) {
+                    const file = dataToSubmit[field.id] as File;
+                    const storageRef = ref(storage, `form-submissions/${id}/${Date.now()}-${file.name}`);
+                    
+                    // The promise will resolve once the file is uploaded and the URL is retrieved
+                    const uploadPromise = uploadBytes(storageRef, file)
+                        .then(snapshot => getDownloadURL(snapshot.ref))
+                        .then(downloadURL => {
+                            // Update the submission data object with the file URL
+                            dataToSubmit[field.id] = downloadURL;
+                        });
+                    
+                    fileUploadPromises.push(uploadPromise);
+                } else if (field.type === 'file') {
+                    // If no file was selected for a file input, ensure it's not trying to submit an empty value
+                    dataToSubmit[field.id] = null;
+                }
+            }
+
+            // Wait for all file uploads to complete
+            await Promise.all(fileUploadPromises);
+
             await addDoc(collection(db, 'formSubmissions'), {
                 templateId: id,
                 templateTitle: template.title,
                 submittedBy: user.uid,
                 userEmail: user.email,
                 submittedAt: serverTimestamp(),
-                formData: formData,
+                formData: dataToSubmit,
             });
 
             toast({
                 title: "Formulaire Soumis",
                 description: "Vos réponses ont été enregistrées avec succès.",
             });
-            router.push('/dashboard');
+            router.push('/dashboard/submissions');
         } catch (error) {
             console.error("Error submitting form data:", error);
             toast({
