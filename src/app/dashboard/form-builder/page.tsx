@@ -14,22 +14,90 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Wand2, Loader2, ClipboardCheck, ArrowRight } from "lucide-react"
+import { Wand2, Loader2, ClipboardCheck, ArrowRight, Save } from "lucide-react"
 import { Separator } from '@/components/ui/separator'
+import { generateForm, FormGeneratorOutput } from '@/ai/flows/form-generator-flow'
+import { useToast } from "@/hooks/use-toast"
+
+// A component to render individual form fields based on the AI response
+const FormFieldRenderer: React.FC<{ field: FormGeneratorOutput['fields'][0] }> = ({ field }) => {
+  switch (field.type) {
+    case 'title':
+      return <h3 className="font-semibold text-lg pt-4">{field.label}</h3>;
+    case 'separator':
+      return <Separator className="my-4" />;
+    case 'text':
+    case 'date':
+    case 'file':
+      return (
+        <div className="space-y-2">
+          <Label htmlFor={field.id}>{field.label}</Label>
+          <Input id={field.id} type={field.type} placeholder={field.placeholder} />
+        </div>
+      );
+    case 'textarea':
+      return (
+        <div className="space-y-2">
+          <Label htmlFor={field.id}>{field.label}</Label>
+          <Textarea id={field.id} placeholder={field.placeholder} rows={3} />
+        </div>
+      );
+    case 'select':
+      return (
+        <div className="space-y-2">
+          <Label htmlFor={field.id}>{field.label}</Label>
+          <Select>
+            <SelectTrigger id={field.id}><SelectValue placeholder={field.placeholder || "Sélectionner..."} /></SelectTrigger>
+            <SelectContent>
+              {field.options?.map(option => <SelectItem key={option} value={option}>{option}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      );
+    case 'checkbox':
+      return (
+        <div className="flex items-center space-x-2">
+          <Checkbox id={field.id} />
+          <Label htmlFor={field.id} className="font-normal">{field.label}</Label>
+        </div>
+      );
+    default:
+      return null;
+  }
+};
+
 
 export default function FormBuilderPage() {
   const [topic, setTopic] = useState("Audit de sécurité pour travaux en hauteur")
   const [isGenerating, setIsGenerating] = useState(false)
-  const [formGenerated, setFormGenerated] = useState(false)
+  const [generatedForm, setGeneratedForm] = useState<FormGeneratorOutput | null>(null)
+  const { toast } = useToast()
 
-  const handleGenerateForm = () => {
+  const handleGenerateForm = async () => {
     if (!topic) return
     setIsGenerating(true)
-    setFormGenerated(false)
-    setTimeout(() => {
+    setGeneratedForm(null)
+    try {
+      const result = await generateForm(topic)
+      setGeneratedForm(result)
+    } catch (error) {
+      console.error("Error generating form:", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur de Génération",
+        description: "L'IA n'a pas pu générer le formulaire. Veuillez réessayer."
+      })
+    } finally {
       setIsGenerating(false)
-      setFormGenerated(true)
-    }, 2000)
+    }
+  }
+  
+  const handleSaveForm = () => {
+    console.log("Saving form structure:", generatedForm)
+    toast({
+      title: "Formulaire Enregistré",
+      description: "La structure de ce formulaire a été sauvegardée pour une utilisation future."
+    })
   }
 
   return (
@@ -51,9 +119,9 @@ export default function FormBuilderPage() {
                 <CardContent>
                     <div className="space-y-2">
                         <Label htmlFor="hse-topic">Sujet HSE / موضوع HSE</Label>
-                        <Textarea 
+                        <Textarea
                             id="hse-topic"
-                            placeholder="Ex: Audit 5S, Dialogue sécurité chariot élévateur..." 
+                            placeholder="Ex: Audit 5S, Dialogue sécurité chariot élévateur..."
                             value={topic}
                             onChange={(e) => setTopic(e.target.value)}
                             rows={4}
@@ -77,7 +145,7 @@ export default function FormBuilderPage() {
             <Card className="min-h-[500px]">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><ClipboardCheck className="text-primary"/> 2. Prévisualisation du Formulaire</CardTitle>
-                    <CardDescription>Voici un aperçu du formulaire généré. Vous pourrez le personnaliser ensuite.</CardDescription>
+                    <CardDescription>Voici un aperçu du formulaire généré. Vous pourrez le sauvegarder pour une utilisation ultérieure.</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {isGenerating && (
@@ -86,58 +154,34 @@ export default function FormBuilderPage() {
                             <p>Analyse du sujet et construction des champs...</p>
                         </div>
                     )}
-                    {formGenerated && (
-                        <fieldset disabled className="space-y-6 animate-in fade-in-50">
-                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label>Date de l'audit</Label>
-                                    <Input type="date" />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Auditeur</Label>
-                                    <Input placeholder="Nom de l'auditeur" />
-                                </div>
-                             </div>
+                    {generatedForm && (
+                        <div className="space-y-6 animate-in fade-in-50">
+                             <CardTitle>{generatedForm.title}</CardTitle>
+                             <CardDescription>{generatedForm.description}</CardDescription>
                              <Separator />
-                             <h3 className="font-semibold text-lg">Vérification des Équipements de Protection Individuelle (EPI)</h3>
-                             <div className="space-y-2">
-                                <Label>État du harnais de sécurité</Label>
-                                <Select>
-                                    <SelectTrigger><SelectValue placeholder="Sélectionner un état" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="conforme">Conforme</SelectItem>
-                                        <SelectItem value="non-conforme">Non conforme</SelectItem>
-                                        <SelectItem value="na">Non applicable</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                             </div>
-                             <div className="space-y-2">
-                                <Label>Présence de la ligne de vie</Label>
-                                <div className="flex items-center space-x-2">
-                                    <Checkbox id="line-presence" />
-                                    <label htmlFor="line-presence">Ligne de vie installée et vérifiée</label>
-                                </div>
-                             </div>
-                             <Separator />
-                             <h3 className="font-semibold text-lg">Conditions de Travail</h3>
-                             <div className="space-y-2">
-                                <Label>Observations générales</Label>
-                                <Textarea placeholder="Décrire les conditions, points positifs et négatifs..." rows={3} />
-                             </div>
-                              <div className="space-y-2">
-                                <Label>Pièces jointes</Label>
-                                <Input type="file" />
-                                <p className="text-xs text-muted-foreground">Ajoutez des photos des anomalies ou des bonnes pratiques.</p>
-                             </div>
-                             <Button type="submit" className="bg-primary hover:bg-primary/90">Soumettre le formulaire</Button>
-                        </fieldset>
+                             <form className="space-y-4">
+                                {generatedForm.fields.map((field) => (
+                                    <FormFieldRenderer key={field.id} field={field} />
+                                ))}
+                             </form>
+                        </div>
                     )}
-                     {!isGenerating && !formGenerated && (
+                     {!isGenerating && !generatedForm && (
                         <div className="flex flex-col items-center justify-center h-64 text-muted-foreground">
                             <p>Le formulaire généré par l'IA apparaîtra ici.</p>
                         </div>
                     )}
                 </CardContent>
+                {generatedForm && !isGenerating && (
+                  <CardFooter className="flex-col items-stretch gap-4">
+                    <Separator/>
+                    <Button onClick={handleSaveForm}>
+                        <Save className="mr-2 h-4 w-4"/>
+                        Enregistrer ce modèle de formulaire
+                    </Button>
+                    <Button type="button" variant="secondary">Soumettre le formulaire rempli</Button>
+                  </CardFooter>
+                )}
             </Card>
         </div>
 
