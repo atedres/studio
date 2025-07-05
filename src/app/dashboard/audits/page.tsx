@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from "react"
 import Link from "next/link"
-import { FilePlus2, Filter } from "lucide-react"
+import { FilePlus2, Filter, Eye } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -88,6 +88,7 @@ export default function DialoguesSecuritePage() {
         <TableCell><Skeleton className="h-4 w-40" /></TableCell>
         <TableCell><Skeleton className="h-4 w-12" /></TableCell>
         <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+        <TableCell><Skeleton className="h-10 w-10" /></TableCell>
       </TableRow>
     ))
   )
@@ -129,6 +130,7 @@ export default function DialoguesSecuritePage() {
                 <TableHead>Zone / Unité</TableHead>
                 <TableHead>Nb. Anomalies</TableHead>
                 <TableHead>Statut</TableHead>
+                <TableHead><span className="sr-only">Actions</span></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -142,6 +144,14 @@ export default function DialoguesSecuritePage() {
                   <TableCell>
                     <Badge variant={getStatusVariant(dialogue.status) as any}>{dialogue.status}</Badge>
                   </TableCell>
+                   <TableCell className="text-right">
+                        <Button asChild variant="outline" size="icon">
+                            <Link href={`/dashboard/audits/${dialogue.id}`}>
+                                <Eye className="h-4 w-4" />
+                                <span className="sr-only">Voir</span>
+                            </Link>
+                        </Button>
+                    </TableCell>
                 </TableRow>
               ))}
             </TableBody>

@@ -21,7 +21,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
-import { FilePlus2, ArrowUp, TrendingUp, UserCheck } from "lucide-react"
+import { FilePlus2, TrendingUp, UserCheck, Eye } from "lucide-react"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, query, orderBy } from "firebase/firestore"
@@ -159,6 +159,7 @@ export default function AnomaliesPage() {
         <TableCell><Skeleton className="h-4 w-40" /></TableCell>
         <TableCell><Skeleton className="h-4 w-12" /></TableCell>
         <TableCell><Skeleton className="h-6 w-32" /></TableCell>
+        <TableCell><Skeleton className="h-10 w-10" /></TableCell>
       </TableRow>
     ))
   )
@@ -218,8 +219,8 @@ export default function AnomaliesPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
         <Card className="col-span-full lg:col-span-4">
             <CardHeader>
-                <CardTitle>Rapports de Chasse aux Anomalies Récents</CardTitle>
-                <CardDescription>Liste des dernières CAA réalisées.</CardDescription>
+                <CardTitle>Rapports de Chasse aux Anomalies</CardTitle>
+                <CardDescription>Liste de toutes les CAA réalisées.</CardDescription>
             </CardHeader>
             <CardContent>
             <Table>
@@ -231,6 +232,7 @@ export default function AnomaliesPage() {
                         <TableHead>Animateur</TableHead>
                         <TableHead>Nb. Anomalies</TableHead>
                         <TableHead>Statut</TableHead>
+                        <TableHead><span className="sr-only">Actions</span></TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -242,13 +244,21 @@ export default function AnomaliesPage() {
                             <TableCell>{caa.animateur}</TableCell>
                             <TableCell className="text-center">{caa.anomalies.length}</TableCell>
                             <TableCell><Badge variant={getStatusVariant(caa.status) as any}>{caa.status}</Badge></TableCell>
+                             <TableCell className="text-right">
+                                <Button asChild variant="outline" size="icon">
+                                    <Link href={`/dashboard/anomalies/${caa.id}`}>
+                                        <Eye className="h-4 w-4" />
+                                        <span className="sr-only">Voir</span>
+                                    </Link>
+                                </Button>
+                            </TableCell>
                         </TableRow>
                     ))}
                 </TableBody>
             </Table>
             </CardContent>
         </Card>
-        <Card className="col-span-full lg:col-span-3">
+        <Card className="col-span-full lg:col-span-3 min-w-0">
             <CardHeader>
                 <CardTitle>Anomalies par Mois</CardTitle>
                 <CardDescription>Nombre d'anomalies signalées au cours des 6 derniers mois.</CardDescription>
