@@ -14,8 +14,20 @@ import {
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore"
-import { FileText, PlusCircle, ArrowRight } from "lucide-react"
+import { collection, getDocs, query, orderBy, Timestamp, doc, deleteDoc } from "firebase/firestore"
+import { FileText, PlusCircle, ArrowRight, Trash2, Loader2 } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
 
 interface FormTemplate {
     id: string;
@@ -28,6 +40,8 @@ interface FormTemplate {
 export default function FormTemplatesPage() {
     const [templates, setTemplates] = useState<FormTemplate[]>([])
     const [loading, setLoading] = useState(true)
+    const [isDeleting, setIsDeleting] = useState<string | null>(null)
+    const { toast } = useToast()
 
     useEffect(() => {
         const fetchTemplates = async () => {
@@ -49,6 +63,27 @@ export default function FormTemplatesPage() {
 
         fetchTemplates();
     }, []);
+
+    const handleDelete = async (templateId: string) => {
+        setIsDeleting(templateId)
+        try {
+            await deleteDoc(doc(db, "formTemplates", templateId));
+            setTemplates(prev => prev.filter(template => template.id !== templateId));
+            toast({
+                title: "Modèle Supprimé",
+                description: "Le modèle de formulaire a été supprimé avec succès.",
+            });
+        } catch (error) {
+            console.error("Error deleting template: ", error);
+            toast({
+                variant: "destructive",
+                title: "Erreur de suppression",
+                description: "Impossible de supprimer le modèle de formulaire.",
+            });
+        } finally {
+            setIsDeleting(null)
+        }
+    }
 
     const renderSkeleton = () => (
         [...Array(3)].map((_, i) => (
@@ -105,12 +140,37 @@ export default function FormTemplatesPage() {
                                     <strong>Sujet d'origine :</strong> {template.topic}
                                 </p>
                             </CardContent>
-                            <CardFooter>
-                                <Button asChild className="w-full">
+                            <CardFooter className="flex justify-between items-center pt-4">
+                                <Button asChild>
                                     <Link href={`/dashboard/templates/${template.id}`}>
-                                        Utiliser ce modèle <ArrowRight className="ml-2 h-4 w-4"/>
+                                        Remplir <ArrowRight className="ml-2 h-4 w-4"/>
                                     </Link>
                                 </Button>
+                                <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                        <Button variant="destructive" size="icon">
+                                            <Trash2 className="h-4 w-4" />
+                                            <span className="sr-only">Supprimer</span>
+                                        </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                            <AlertDialogTitle>Êtes-vous sûr de vouloir supprimer ?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                                Cette action est irréversible. Le modèle sera définitivement supprimé. Les soumissions existantes basées sur ce modèle ne pourront plus être consultées.
+                                            </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                            <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                            <AlertDialogAction 
+                                                onClick={() => handleDelete(template.id)}
+                                                disabled={isDeleting === template.id}>
+                                                {isDeleting === template.id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                                Confirmer la suppression
+                                            </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                </AlertDialog>
                             </CardFooter>
                         </Card>
                     ))}
