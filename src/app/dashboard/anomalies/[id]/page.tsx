@@ -4,15 +4,28 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, Timestamp, deleteDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Edit, User, Users, CalendarDays, MapPin, ClipboardList, AlertTriangle, ChevronsRight, Milestone } from 'lucide-react';
+import { ArrowLeft, Edit, User, Users, CalendarDays, MapPin, ClipboardList, AlertTriangle, ChevronsRight, Milestone, Trash2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { useToast } from "@/hooks/use-toast"
+
 
 interface Anomaly {
     description: string;
@@ -42,9 +55,12 @@ export default function ChasseAuxAnomaliesDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
+    const { toast } = useToast();
 
     const [caa, setCaa] = useState<CAADetails | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isDeleting, setIsDeleting] = useState(false);
+
 
     useEffect(() => {
         if (!id) return;
@@ -65,6 +81,27 @@ export default function ChasseAuxAnomaliesDetailPage() {
 
         fetchCAA();
     }, [id]);
+
+    const handleDelete = async () => {
+        setIsDeleting(true);
+        try {
+            const docRef = doc(db, 'chassesAuxAnomalies', id);
+            await deleteDoc(docRef);
+            toast({
+                title: "Suppression réussie",
+                description: "Le rapport de CAA a été supprimé.",
+            });
+            router.push('/dashboard/anomalies');
+        } catch (error) {
+            console.error("Error deleting document: ", error);
+            toast({
+                variant: "destructive",
+                title: "Erreur de suppression",
+                description: "Impossible de supprimer le rapport. Veuillez réessayer.",
+            });
+            setIsDeleting(false);
+        }
+    }
 
     const getStatusVariant = (status: string) => {
         switch (status) {
@@ -116,11 +153,35 @@ export default function ChasseAuxAnomaliesDetailPage() {
                         <p className="text-muted-foreground">ID: {caa.id}</p>
                     </div>
                 </div>
-                 <Button asChild>
-                    <Link href={`/dashboard/anomalies/${caa.id}/edit`}>
-                        <Edit className="mr-2 h-4 w-4" /> Modifier
-                    </Link>
-                </Button>
+                 <div className="flex items-center gap-2">
+                    <Button asChild>
+                        <Link href={`/dashboard/anomalies/${caa.id}/edit`}>
+                            <Edit className="mr-2 h-4 w-4" /> Modifier
+                        </Link>
+                    </Button>
+                     <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                            <Button variant="destructive">
+                                <Trash2 className="mr-2 h-4 w-4" /> Supprimer
+                            </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Êtes-vous sûr de vouloir supprimer ?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    Cette action est irréversible. Le rapport sera définitivement supprimé de la base de données.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
+                                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Confirmer la suppression
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
             </div>
 
             <Card>
