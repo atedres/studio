@@ -5,6 +5,7 @@ import {
   AlertTriangle,
   Archive,
   ClipboardCheck,
+  Inbox,
   LayoutDashboard,
   Loader2,
   Settings,
@@ -38,6 +39,7 @@ const navItems = [
   { href: "/dashboard/reunions", icon: Users, label: "Réunions SST" },
   { href: "/dashboard/form-builder", icon: Wrench, label: "Générateur IA" },
   { href: "/dashboard/templates", icon: Archive, label: "Modèles de Formulaires" },
+  { href: "/dashboard/submissions", icon: Inbox, label: "Soumissions" },
   { href: "/dashboard/settings", icon: Settings, label: "Paramètres" },
 ]
 
