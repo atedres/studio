@@ -26,6 +26,7 @@ import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recha
 import { db } from "@/lib/firebase"
 import { collection, getDocs, query, orderBy } from "firebase/firestore"
 import { startOfMonth, subMonths, format } from 'date-fns'
+import { useAuth } from "@/hooks/use-auth"
 
 interface Reunion {
     id: string;
@@ -47,6 +48,9 @@ export default function ReunionsPage() {
   const [reunions, setReunions] = useState<Reunion[]>([])
   const [stats, setStats] = useState<ReunionStats | null>(null)
   const [loading, setLoading] = useState(true)
+  const { user } = useAuth();
+
+  const canManage = user && ['niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
 
   useEffect(() => {
     const fetchReunions = async () => {
@@ -188,12 +192,14 @@ export default function ReunionsPage() {
                       <CardTitle>Historique des Réunions</CardTitle>
                       <CardDescription>Liste de toutes les réunions planifiées et passées.</CardDescription>
                   </div>
-                  <Button asChild className="bg-accent hover:bg-accent/90">
-                    <Link href="/dashboard/reunions/new">
-                      <PlusCircle className="mr-2 h-4 w-4" />
-                      Programmer une réunion
-                    </Link>
-                  </Button>
+                  {canManage && (
+                    <Button asChild className="bg-accent hover:bg-accent/90">
+                      <Link href="/dashboard/reunions/new">
+                        <PlusCircle className="mr-2 h-4 w-4" />
+                        Programmer une réunion
+                      </Link>
+                    </Button>
+                  )}
               </CardHeader>
               <CardContent>
                  <Table>

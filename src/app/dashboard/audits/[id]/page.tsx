@@ -25,6 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from '@/hooks/use-auth';
 
 interface Anomaly {
     type: "AD" | "IS" | "SD";
@@ -57,10 +58,13 @@ export default function DialogueSecuriteDetailPage() {
     const router = useRouter();
     const id = params.id as string;
     const { toast } = useToast();
+    const { user } = useAuth();
 
     const [ds, setDs] = useState<DSDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    const canManage = user && ['niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
 
     useEffect(() => {
         if (!id) return;
@@ -162,6 +166,7 @@ export default function DialogueSecuriteDetailPage() {
                         <p className="text-muted-foreground">ID: {ds.id}</p>
                     </div>
                 </div>
+                {canManage && (
                  <div className="flex items-center gap-2">
                     <Button asChild>
                         <Link href={`/dashboard/audits/${ds.id}/edit`}>
@@ -191,6 +196,7 @@ export default function DialogueSecuriteDetailPage() {
                         </AlertDialogContent>
                     </AlertDialog>
                 </div>
+                )}
             </div>
 
             <Card>

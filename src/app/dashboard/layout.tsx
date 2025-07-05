@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -34,15 +35,15 @@ import { UserNav } from "@/components/user-nav"
 
 
 const navItems = [
-  { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord" },
-  { href: "/dashboard/audits", icon: ClipboardCheck, label: "Dialogue Sécurité / Audits" },
-  { href: "/dashboard/anomalies", icon: AlertTriangle, label: "Chasse aux Anomalies" },
-  { href: "/dashboard/actions", icon: ListChecks, label: "Plan d'Action" },
-  { href: "/dashboard/reunions", icon: Users, label: "Réunions SST" },
-  { href: "/dashboard/form-builder", icon: Wrench, label: "Générateur IA" },
-  { href: "/dashboard/templates", icon: Archive, label: "Modèles de Formulaires" },
-  { href: "/dashboard/submissions", icon: Inbox, label: "Soumissions" },
-  { href: "/dashboard/settings", icon: Settings, label: "Paramètres" },
+  { href: "/dashboard", icon: LayoutDashboard, label: "Tableau de bord", roles: ['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
+  { href: "/dashboard/audits", icon: ClipboardCheck, label: "Dialogue Sécurité / Audits", roles: ['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
+  { href: "/dashboard/anomalies", icon: AlertTriangle, label: "Chasse aux Anomalies", roles: ['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
+  { href: "/dashboard/actions", icon: ListChecks, label: "Plan d'Action", roles: ['niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
+  { href: "/dashboard/reunions", icon: Users, label: "Réunions SST", roles: ['niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
+  { href: "/dashboard/form-builder", icon: Wrench, label: "Générateur IA", roles: ['niveau3', 'niveau4', 'niveau5', 'admin'] },
+  { href: "/dashboard/templates", icon: Archive, label: "Modèles de Formulaires", roles: ['niveau3', 'niveau4', 'niveau5', 'admin'] },
+  { href: "/dashboard/submissions", icon: Inbox, label: "Soumissions", roles: ['niveau3', 'niveau4', 'niveau5', 'admin'] },
+  { href: "/dashboard/settings", icon: Settings, label: "Paramètres", roles: ['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
 ]
 
 function ProtectedDashboardLayout({
@@ -67,6 +68,8 @@ function ProtectedDashboardLayout({
       </div>
     )
   }
+  
+  const visibleNavItems = navItems.filter(item => user && item.roles.includes(user.role));
 
   const NavContent = () => (
     <>
@@ -80,7 +83,7 @@ function ProtectedDashboardLayout({
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {navItems.map((item) => (
+          {visibleNavItems.map((item) => (
             <SidebarMenuItem key={item.href}>
               <SidebarMenuButton
                 asChild

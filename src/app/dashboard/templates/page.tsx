@@ -28,6 +28,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/hooks/use-auth"
 
 interface FormTemplate {
     id: string;
@@ -42,6 +43,9 @@ export default function FormTemplatesPage() {
     const [loading, setLoading] = useState(true)
     const [isDeleting, setIsDeleting] = useState<string | null>(null)
     const { toast } = useToast()
+    const { user } = useAuth();
+    
+    const canManage = user?.role === 'admin';
 
     useEffect(() => {
         const fetchTemplates = async () => {
@@ -146,6 +150,7 @@ export default function FormTemplatesPage() {
                                         Remplir <ArrowRight className="ml-2 h-4 w-4"/>
                                     </Link>
                                 </Button>
+                                {canManage && (
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                         <Button variant="destructive" size="icon">
@@ -171,6 +176,7 @@ export default function FormTemplatesPage() {
                                         </AlertDialogFooter>
                                     </AlertDialogContent>
                                 </AlertDialog>
+                                )}
                             </CardFooter>
                         </Card>
                     ))}

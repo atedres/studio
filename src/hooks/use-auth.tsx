@@ -1,3 +1,4 @@
+
 "use client"
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
@@ -11,11 +12,16 @@ import {
   reauthenticateWithCredential,
   updatePassword as firebaseUpdatePassword,
 } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { useRouter } from 'next/navigation';
 
+export type AppUser = User & {
+  role: string;
+};
+
 interface AuthContextType {
-  user: User | null;
+  user: AppUser | null;
   loading: boolean;
   signIn: typeof signInWithEmailAndPassword;
   signOut: () => Promise<void>;
@@ -26,13 +32,35 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+      if (authUser) {
+        const userDocRef = doc(db, 'users', authUser.uid);
+        const userDocSnap = await getDoc(userDocRef);
+        let role = 'niveau1'; // Default role
+        if (userDocSnap.exists()) {
+          role = userDocSnap.data().role || 'niveau1';
+        } else {
+          // If user doc doesn't exist, create it for them with default role
+          try {
+              await setDoc(userDocRef, {
+                  email: authUser.email,
+                  displayName: authUser.displayName || authUser.email,
+                  role: 'niveau1',
+                  createdAt: serverTimestamp(),
+              });
+          } catch (e) {
+              console.error("Error creating user document", e);
+          }
+        }
+        setUser({ ...authUser, role });
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
 
@@ -42,9 +70,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updateUserProfile = async (data: { displayName: string }) => {
     if (auth.currentUser) {
       await updateProfile(auth.currentUser, data);
+      // Update the user document in Firestore as well
+      const userDocRef = doc(db, 'users', auth.currentUser.uid);
+      await setDoc(userDocRef, { displayName: data.displayName }, { merge: true });
       // Create a new object from auth.currentUser to force a state update.
-      // This ensures the whole app gets the updated user information.
-      setUser(auth.currentUser ? { ...auth.currentUser } : null);
+      setUser(prevUser => prevUser ? { ...prevUser, ...auth.currentUser, displayName: data.displayName } as AppUser : null);
     } else {
       throw new Error("User not authenticated");
     }
@@ -54,9 +84,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const currentUser = auth.currentUser;
     if (currentUser && currentUser.email) {
         const credential = EmailAuthProvider.credential(currentUser.email, oldPass);
-        // Re-authenticate the user
         await reauthenticateWithCredential(currentUser, credential);
-        // Now update the password
         await firebaseUpdatePassword(currentUser, newPass);
     } else {
         throw new Error("User not authenticated or email not available.");

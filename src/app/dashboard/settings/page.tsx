@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect } from "react"
@@ -6,6 +7,8 @@ import { useToast } from "@/hooks/use-toast"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useForm } from "react-hook-form"
+import { db } from "@/lib/firebase"
+import { collection, getDocs, doc, updateDoc } from "firebase/firestore"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -36,6 +39,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { User, Bell, Lock, Users, Loader2 } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
 
 const passwordSchema = z.object({
     currentPassword: z.string().min(1, "Le mot de passe actuel est requis."),
@@ -48,9 +54,128 @@ const passwordSchema = z.object({
 
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
+interface AppUserDoc {
+  id: string;
+  email: string;
+  displayName: string;
+  role: string;
+}
+
+const UserManagementCard = () => {
+  const [users, setUsers] = useState<AppUserDoc[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoadingUsers(true);
+      try {
+        const usersCollection = collection(db, "users");
+        const usersSnapshot = await getDocs(usersCollection);
+        const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AppUserDoc[];
+        setUsers(usersList);
+      } catch (error) {
+        console.error("Error fetching users: ", error);
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Impossible de charger la liste des utilisateurs.",
+        });
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+    fetchUsers();
+  }, [toast]);
+
+  const handleRoleChange = async (userId: string, newRole: string) => {
+    const userDocRef = doc(db, "users", userId);
+    try {
+      await updateDoc(userDocRef, { role: newRole });
+      setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      toast({
+        title: "Rôle mis à jour",
+        description: `Le rôle a été changé en ${newRole}.`,
+      });
+    } catch (error) {
+      console.error("Error updating role: ", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de mettre à jour le rôle.",
+      });
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Gestion des Utilisateurs</CardTitle>
+        <CardDescription>Attribuez des rôles aux utilisateurs pour gérer leurs permissions.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Email</TableHead>
+              <TableHead>Rôle</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {loadingUsers ? (
+              [...Array(3)].map((_, i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                  <TableCell><Skeleton className="h-10 w-32" /></TableCell>
+                </TableRow>
+              ))
+            ) : (
+              users.map(u => (
+                <TableRow key={u.id}>
+                  <TableCell>{u.email}</TableCell>
+                  <TableCell>
+                    <Select value={u.role} onValueChange={(value) => handleRoleChange(u.id, value)}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Choisir un rôle" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="niveau5">Direction</SelectItem>
+                        <SelectItem value="niveau4">Responsable</SelectItem>
+                        <SelectItem value="niveau3">Superviseur</SelectItem>
+                        <SelectItem value="niveau2">Animateur</SelectItem>
+                        <SelectItem value="niveau1">Collaborateur</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+};
+
+const AccessRightsPlaceholder = () => (
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Gestion des Droits d'Accès</CardTitle>
+      <CardDescription>Visualisez les permissions pour chaque rôle utilisateur.</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <p className="text-sm text-muted-foreground">
+        Contactez votre administrateur pour modifier les rôles des utilisateurs.
+      </p>
+    </CardContent>
+  </Card>
+);
+
 export default function SettingsPage() {
   const { user, updateUserProfile, updateUserPassword } = useAuth()
   const { toast } = useToast()
+  const isAdmin = user?.role === 'admin';
 
   const [displayName, setDisplayName] = useState("")
   const [email, setEmail] = useState("")
@@ -131,7 +256,6 @@ export default function SettingsPage() {
     }
   }
 
-
   return (
     <div className="space-y-6">
       <div>
@@ -143,42 +267,7 @@ export default function SettingsPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Gestion des Droits d'Accès</CardTitle>
-                    <CardDescription>Définissez les permissions pour chaque rôle utilisateur.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                            <p className="font-medium">Opérateur</p>
-                            <p className="text-sm text-muted-foreground">Peut saisir des remontées terrain.</p>
-                        </div>
-                        <Button variant="outline">Gérer</Button>
-                    </div>
-                     <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                            <p className="font-medium">Manager</p>
-                            <p className="text-sm text-muted-foreground">Valide les plans d'actions.</p>
-                        </div>
-                        <Button variant="outline">Gérer</Button>
-                    </div>
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                            <p className="font-medium">Admin HSE</p>
-                            <p className="text-sm text-muted-foreground">Accès complet aux modules HSE.</p>
-                        </div>
-                        <Button variant="outline">Gérer</Button>
-                    </div>
-                    <div className="flex items-center justify-between p-3 border rounded-lg">
-                        <div>
-                            <p className="font-medium">Direction</p>
-                            <p className="text-sm text-muted-foreground">Visualise les tableaux de bord globaux.</p>
-                        </div>
-                        <Button variant="outline">Gérer</Button>
-                    </div>
-                </CardContent>
-            </Card>
+            {isAdmin ? <UserManagementCard /> : <AccessRightsPlaceholder />}
 
             <Card>
                 <CardHeader>

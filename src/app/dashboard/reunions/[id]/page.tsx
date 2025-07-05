@@ -25,6 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from '@/hooks/use-auth';
 
 interface ReunionDetails {
   id: string;
@@ -48,10 +49,13 @@ export default function ReunionDetailPage() {
     const router = useRouter();
     const id = params.id as string;
     const { toast } = useToast();
+    const { user } = useAuth();
 
     const [reunion, setReunion] = useState<ReunionDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    const canManage = user && ['niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
 
     useEffect(() => {
         if (!id) return;
@@ -155,6 +159,7 @@ export default function ReunionDetailPage() {
                         <p className="text-muted-foreground">Objet: {reunion.objet}</p>
                     </div>
                 </div>
+                {canManage && (
                  <div className="flex items-center gap-2">
                     <Button asChild>
                         <Link href={`/dashboard/reunions/${reunion.id}/edit`}>
@@ -184,6 +189,7 @@ export default function ReunionDetailPage() {
                         </AlertDialogContent>
                     </AlertDialog>
                 </div>
+                )}
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

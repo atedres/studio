@@ -25,6 +25,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from '@/hooks/use-auth';
 import { Separator } from '@/components/ui/separator';
 
 
@@ -58,10 +59,13 @@ export default function ChasseAuxAnomaliesDetailPage() {
     const router = useRouter();
     const id = params.id as string;
     const { toast } = useToast();
+    const { user } = useAuth();
 
     const [caa, setCaa] = useState<CAADetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
+
+    const canManage = user && ['niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
 
 
     useEffect(() => {
@@ -165,6 +169,7 @@ export default function ChasseAuxAnomaliesDetailPage() {
                         <p className="text-muted-foreground">ID: {caa.id}</p>
                     </div>
                 </div>
+                {canManage && (
                  <div className="flex items-center gap-2">
                     <Button asChild>
                         <Link href={`/dashboard/anomalies/${caa.id}/edit`}>
@@ -194,6 +199,7 @@ export default function ChasseAuxAnomaliesDetailPage() {
                         </AlertDialogContent>
                     </AlertDialog>
                 </div>
+                )}
             </div>
 
             <Card>
