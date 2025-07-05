@@ -53,7 +53,7 @@ export default function NewChasseAuxAnomaliesPage() {
     defaultValues: {
       animateur: user?.email || '',
       date: new Date(),
-      anomalies: [{ description: '', famille: '', avancement: 'En cours' }],
+      anomalies: [{ description: '', famille: '', avancement: 'En cours', actionsCorrectives: '', responsable: '' }],
       participants: '',
       commentaires: '',
     },
@@ -195,7 +195,7 @@ export default function NewChasseAuxAnomaliesPage() {
                         </Button>
                     </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ description: '', famille: '', avancement: 'En cours' })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ description: '', famille: '', avancement: 'En cours', actionsCorrectives: '', responsable: '' })}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Ajouter une anomalie
                 </Button>
@@ -233,4 +233,3 @@ export default function NewChasseAuxAnomaliesPage() {
     </div>
   )
 }
-

@@ -332,7 +332,7 @@ export default function NewDialogueSecuritePage() {
                         </Button>
                     </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ type: 'AD', description: '', familleRisque: '', statut: 'En cours' })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ type: 'AD', description: '', familleRisque: '', statut: 'En cours', actionsImmediates: '', actionsCorrectives: '', responsable: '', garant: '' })}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Ajouter une anomalie
                 </Button>
