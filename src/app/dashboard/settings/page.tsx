@@ -9,7 +9,10 @@ import * as z from "zod"
 import { useForm } from "react-hook-form"
 import { db, auth } from "@/lib/firebase"
 import { collection, getDocs, doc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore"
-import { createUserWithEmailAndPassword, signOut as firebaseSignOut } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { initializeApp, deleteApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+
 
 import { Button } from "@/components/ui/button"
 import {
@@ -128,8 +131,24 @@ const UserManagementCard = () => {
   };
 
   const handleCreateUser = async (values: UserCreationFormValues) => {
+    // This is a workaround to create a user without signing out the admin.
+    // We create a temporary, secondary Firebase app instance to handle the creation.
+    const tempAppName = `user-creation-${Date.now()}`;
+    const firebaseConfig = {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+      measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+    };
+
+    const tempApp = initializeApp(firebaseConfig, tempAppName);
+    const tempAuth = getAuth(tempApp);
+
     try {
-        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        const userCredential = await createUserWithEmailAndPassword(tempAuth, values.email, values.password);
         const newUser = userCredential.user;
 
         await setDoc(doc(db, "users", newUser.uid), {
@@ -148,14 +167,6 @@ const UserManagementCard = () => {
 
         userCreationForm.reset();
         setIsCreateUserOpen(false);
-
-        await firebaseSignOut(auth);
-        
-        toast({
-            title: "Reconnexion requise",
-            description: "Pour des raisons de sécurité, veuillez vous reconnecter.",
-            duration: 5000,
-        });
         
     } catch (error: any) {
         console.error("Error creating user: ", error);
@@ -172,6 +183,8 @@ const UserManagementCard = () => {
             title: "Erreur de création",
             description,
         });
+    } finally {
+        await deleteApp(tempApp);
     }
   };
 
@@ -191,8 +204,6 @@ const UserManagementCard = () => {
                     <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
                     <DialogDescription>
                         Assignez un email, un mot de passe temporaire et un rôle.
-                        <br/>
-                        <strong className="text-destructive">Attention:</strong> Pour des raisons de sécurité, vous serez déconnecté après la création.
                     </DialogDescription>
                 </DialogHeader>
                  <Form {...userCreationForm}>
@@ -536,3 +547,5 @@ export default function SettingsPage() {
     </div>
   )
 }
+
+    
