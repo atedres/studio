@@ -50,6 +50,13 @@ export default function NewReunionPage() {
       animateur: user?.email || '',
       nature: "presentielle",
       date: new Date(),
+      source: '',
+      objet: '',
+      heure: '',
+      lieu: '',
+      duree: '',
+      collaborateurs: '',
+      support: undefined,
     },
   })
 
