@@ -7,8 +7,9 @@ import { useToast } from "@/hooks/use-toast"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useForm } from "react-hook-form"
-import { db } from "@/lib/firebase"
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore"
+import { db, auth } from "@/lib/firebase"
+import { collection, getDocs, doc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { createUserWithEmailAndPassword, signOut as firebaseSignOut } from "firebase/auth";
 
 import { Button } from "@/components/ui/button"
 import {
@@ -38,7 +39,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { User, Bell, Lock, Users, Loader2 } from "lucide-react"
+import { User, Bell, Lock, Users, Loader2, UserPlus } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -54,6 +55,15 @@ const passwordSchema = z.object({
 
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
+const userCreationSchema = z.object({
+    email: z.string().email({ message: "L'adresse email est invalide." }),
+    password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères."),
+    role: z.enum(['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin']),
+});
+
+type UserCreationFormValues = z.infer<typeof userCreationSchema>;
+
+
 interface AppUserDoc {
   id: string;
   email: string;
@@ -64,7 +74,17 @@ interface AppUserDoc {
 const UserManagementCard = () => {
   const [users, setUsers] = useState<AppUserDoc[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
   const { toast } = useToast();
+
+  const userCreationForm = useForm<UserCreationFormValues>({
+    resolver: zodResolver(userCreationSchema),
+    defaultValues: {
+        email: "",
+        password: "",
+        role: "niveau1",
+    }
+  });
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -107,11 +127,137 @@ const UserManagementCard = () => {
     }
   };
 
+  const handleCreateUser = async (values: UserCreationFormValues) => {
+    try {
+        const userCredential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+        const newUser = userCredential.user;
+
+        await setDoc(doc(db, "users", newUser.uid), {
+            email: newUser.email,
+            displayName: newUser.email,
+            role: values.role,
+            createdAt: serverTimestamp(),
+        });
+        
+        setUsers(prev => [...prev, { id: newUser.uid, email: newUser.email!, displayName: newUser.email!, role: values.role }]);
+
+        toast({
+            title: "Utilisateur créé avec succès",
+            description: `Le compte pour ${values.email} a été créé.`,
+        });
+
+        userCreationForm.reset();
+        setIsCreateUserOpen(false);
+
+        await firebaseSignOut(auth);
+        
+        toast({
+            title: "Reconnexion requise",
+            description: "Pour des raisons de sécurité, veuillez vous reconnecter.",
+            duration: 5000,
+        });
+        
+    } catch (error: any) {
+        console.error("Error creating user: ", error);
+        let description = "Une erreur est survenue lors de la création de l'utilisateur.";
+        if (error.code === 'auth/email-already-in-use') {
+            description = "Cette adresse email est déjà utilisée par un autre compte.";
+            userCreationForm.setError("email", { type: "manual", message: description });
+        } else if (error.code === 'auth/weak-password') {
+            description = "Le mot de passe est trop faible.";
+             userCreationForm.setError("password", { type: "manual", message: description });
+        }
+        toast({
+            variant: "destructive",
+            title: "Erreur de création",
+            description,
+        });
+    }
+  };
+
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Gestion des Utilisateurs</CardTitle>
-        <CardDescription>Attribuez des rôles aux utilisateurs pour gérer leurs permissions.</CardDescription>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+            <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Gestion des Utilisateurs</CardTitle>
+            <CardDescription>Attribuez des rôles aux utilisateurs pour gérer leurs permissions.</CardDescription>
+        </div>
+        <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
+            <DialogTrigger asChild>
+                <Button><UserPlus className="mr-2 h-4 w-4" /> Ajouter un utilisateur</Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                    <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
+                    <DialogDescription>
+                        Assignez un email, un mot de passe temporaire et un rôle.
+                        <br/>
+                        <strong className="text-destructive">Attention:</strong> Pour des raisons de sécurité, vous serez déconnecté après la création.
+                    </DialogDescription>
+                </DialogHeader>
+                 <Form {...userCreationForm}>
+                    <form onSubmit={userCreationForm.handleSubmit(handleCreateUser)} className="space-y-4">
+                        <FormField
+                            control={userCreationForm.control}
+                            name="email"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Email</FormLabel>
+                                    <FormControl>
+                                        <Input type="email" placeholder="utilisateur@exemple.com" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={userCreationForm.control}
+                            name="password"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Mot de passe temporaire</FormLabel>
+                                    <FormControl>
+                                        <Input type="password" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <FormField
+                            control={userCreationForm.control}
+                            name="role"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Rôle</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Choisir un rôle" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        <SelectItem value="admin">Admin</SelectItem>
+                                        <SelectItem value="niveau5">Direction</SelectItem>
+                                        <SelectItem value="niveau4">Responsable</SelectItem>
+                                        <SelectItem value="niveau3">Superviseur</SelectItem>
+                                        <SelectItem value="niveau2">Animateur</SelectItem>
+                                        <SelectItem value="niveau1">Collaborateur</SelectItem>
+                                    </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+                        <DialogFooter>
+                            <Button type="submit" disabled={userCreationForm.formState.isSubmitting}>
+                                {userCreationForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Créer l'utilisateur
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
       </CardHeader>
       <CardContent>
         <Table>
