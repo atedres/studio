@@ -3,6 +3,7 @@
 import Link from "next/link"
 import {
   AlertTriangle,
+  Archive,
   ClipboardCheck,
   LayoutDashboard,
   Loader2,
@@ -35,7 +36,8 @@ const navItems = [
   { href: "/dashboard/audits", icon: ClipboardCheck, label: "Dialogue Sécurité / Audits" },
   { href: "/dashboard/anomalies", icon: AlertTriangle, label: "Chasse aux Anomalies" },
   { href: "/dashboard/reunions", icon: Users, label: "Réunions SST" },
-  { href: "/dashboard/form-builder", icon: Wrench, label: "Générateur de Formulaires" },
+  { href: "/dashboard/form-builder", icon: Wrench, label: "Générateur IA" },
+  { href: "/dashboard/templates", icon: Archive, label: "Modèles de Formulaires" },
   { href: "/dashboard/settings", icon: Settings, label: "Paramètres" },
 ]
 
