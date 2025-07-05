@@ -145,6 +145,8 @@ export default function AnomaliesPage() {
             return "destructive"
           case "Actions en cours":
             return "outline"
+          case "Brouillon":
+            return "secondary"
           default:
             return "secondary"
         }
@@ -246,9 +248,9 @@ export default function AnomaliesPage() {
                             <TableCell><Badge variant={getStatusVariant(caa.status) as any}>{caa.status}</Badge></TableCell>
                              <TableCell className="text-right">
                                 <Button asChild variant="outline" size="icon">
-                                    <Link href={`/dashboard/anomalies/${caa.id}`}>
+                                    <Link href={caa.status === 'Brouillon' ? `/dashboard/anomalies/${caa.id}/edit` : `/dashboard/anomalies/${caa.id}`}>
                                         <Eye className="h-4 w-4" />
-                                        <span className="sr-only">Voir</span>
+                                        <span className="sr-only">{caa.status === 'Brouillon' ? 'Modifier' : 'Voir'}</span>
                                     </Link>
                                 </Button>
                             </TableCell>

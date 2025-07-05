@@ -146,9 +146,9 @@ export default function DialoguesSecuritePage() {
                   </TableCell>
                    <TableCell className="text-right">
                         <Button asChild variant="outline" size="icon">
-                            <Link href={`/dashboard/audits/${dialogue.id}`}>
+                            <Link href={dialogue.status === 'Brouillon' ? `/dashboard/audits/${dialogue.id}/edit` : `/dashboard/audits/${dialogue.id}`}>
                                 <Eye className="h-4 w-4" />
-                                <span className="sr-only">Voir</span>
+                                <span className="sr-only">{dialogue.status === 'Brouillon' ? 'Modifier' : 'Voir'}</span>
                             </Link>
                         </Button>
                     </TableCell>

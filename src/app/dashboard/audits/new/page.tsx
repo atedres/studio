@@ -111,12 +111,40 @@ export default function NewDialogueSecuritePage() {
     }
   }
 
-  function onSaveDraft(data: DialogueSecuriteFormValues) {
-    console.log("Draft saved:", data)
-    toast({
-      title: "Brouillon Enregistré",
-      description: "Le dialogue de sécurité a été sauvegardé en tant que brouillon.",
-    })
+  async function onSaveDraft() {
+    if (!user) {
+        toast({
+            variant: "destructive",
+            title: "Erreur d'authentification",
+            description: "Vous devez être connecté pour enregistrer un brouillon.",
+        })
+        return
+    }
+    setIsSubmitting(true);
+    const data = form.getValues();
+    try {
+      await addDoc(collection(db, "dialoguesSecurite"), {
+        ...data,
+        status: "Brouillon",
+        createdBy: user.uid,
+        userEmail: user.email,
+        createdAt: serverTimestamp(),
+      });
+      toast({
+        title: "Brouillon Enregistré",
+        description: "Le dialogue de sécurité a été sauvegardé en tant que brouillon.",
+      })
+      router.push('/dashboard/audits');
+    } catch (error) {
+      console.error("Error saving draft: ", error)
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible d'enregistrer le brouillon. Veuillez réessayer.",
+      })
+    } finally {
+        setIsSubmitting(false);
+    }
   }
 
   return (
@@ -354,7 +382,8 @@ export default function NewDialogueSecuritePage() {
           </Card>
 
           <div className="flex justify-end gap-4">
-            <Button type="button" variant="secondary" onClick={() => onSaveDraft(form.getValues())}>
+            <Button type="button" variant="secondary" onClick={onSaveDraft} disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Enregistrer le brouillon
             </Button>
             <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
