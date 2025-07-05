@@ -25,6 +25,11 @@ import { FilePlus2, ArrowUp, TrendingUp, UserCheck } from "lucide-react"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, query, orderBy } from "firebase/firestore"
+import { startOfMonth, subMonths, format, getMonth, getYear } from 'date-fns';
+
+interface Anomaly {
+  avancement: string;
+}
 
 interface CAA {
     id: string;
@@ -34,22 +39,21 @@ interface CAA {
     };
     zone: string;
     animateur: string;
-    anomalies: any[];
+    anomalies: Anomaly[];
     status: string;
 }
 
-
-const anomaliesByMonth = [
-    { name: "Jan", "Anomalies": 30 },
-    { name: "Fév", "Anomalies": 25 },
-    { name: "Mar", "Anomalies": 40 },
-    { name: "Avr", "Anomalies": 35 },
-    { name: "Mai", "Anomalies": 50 },
-    { name: "Juin", "Anomalies": 45 },
-]
+interface AnomalyStats {
+    anomaliesCeMois: number;
+    tauxResolution: number;
+    anomaliesOuvertes: number;
+    topAnimateur: { name: string; count: number };
+    anomaliesParMois: { name: string; "Anomalies": number }[];
+}
 
 export default function AnomaliesPage() {
     const [caas, setCaas] = useState<CAA[]>([])
+    const [stats, setStats] = useState<AnomalyStats | null>(null)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -63,12 +67,71 @@ export default function AnomaliesPage() {
                     ...doc.data()
                 })) as CAA[];
                 setCaas(caasData);
+                calculateStats(caasData);
             } catch (error) {
                 console.error("Error fetching CAAs: ", error);
             } finally {
                 setLoading(false);
             }
         };
+
+        const calculateStats = (data: CAA[]) => {
+            const now = new Date();
+            const debutMois = startOfMonth(now);
+            
+            const allAnomalies = data.flatMap(caa => caa.anomalies);
+
+            // Anomalies ce mois-ci
+            const anomaliesCeMois = data
+                .filter(caa => new Date(caa.date.seconds * 1000) >= debutMois)
+                .reduce((acc, caa) => acc + caa.anomalies.length, 0);
+
+            // Taux de résolution
+            const anomaliesRealisees = allAnomalies.filter(a => a.avancement === 'Réalisée').length;
+            const tauxResolution = allAnomalies.length > 0 ? Math.round((anomaliesRealisees / allAnomalies.length) * 100) : 0;
+
+            // Anomalies ouvertes
+            const anomaliesOuvertes = allAnomalies.filter(a => a.avancement !== 'Réalisée').length;
+            
+            // Top Animateur
+            const animateurCounts = data.reduce((acc, caa) => {
+                acc[caa.animateur] = (acc[caa.animateur] || 0) + 1;
+                return acc;
+            }, {} as Record<string, number>);
+
+            const topAnimateur = Object.entries(animateurCounts).reduce((top, [name, count]) => {
+                return count > top.count ? { name, count } : top;
+            }, { name: 'N/A', count: 0 });
+
+
+            // Anomalies par mois (6 derniers mois)
+            const anomaliesParMoisMap = new Map<string, number>();
+             for (let i = 5; i >= 0; i--) {
+                const d = subMonths(now, i);
+                const monthName = format(d, 'MMM');
+                anomaliesParMoisMap.set(monthName, 0);
+            }
+            data.forEach(caa => {
+                const date = new Date(caa.date.seconds * 1000);
+                 const monthName = format(date, 'MMM');
+                if (anomaliesParMoisMap.has(monthName)) {
+                   anomaliesParMoisMap.set(monthName, (anomaliesParMoisMap.get(monthName) || 0) + caa.anomalies.length);
+                }
+            });
+
+            const anomaliesParMois = Array.from(anomaliesParMoisMap.entries()).map(([name, count]) => ({
+                name,
+                "Anomalies": count,
+            }));
+
+            setStats({
+                anomaliesCeMois,
+                tauxResolution,
+                anomaliesOuvertes,
+                topAnimateur,
+                anomaliesParMois,
+            });
+        }
 
         fetchCAAs();
     }, []);
@@ -116,10 +179,8 @@ export default function AnomaliesPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">45</div>
-            <p className="text-xs text-muted-foreground flex items-center">
-                <ArrowUp className="h-3 w-3 mr-1 text-green-600"/> -10% vs mois dernier
-            </p>
+             {loading ? <Skeleton className="h-7 w-12" /> : <div className="text-2xl font-bold">{stats?.anomaliesCeMois}</div>}
+             <p className="text-xs text-muted-foreground">Depuis le début du mois</p>
           </CardContent>
         </Card>
         <Card>
@@ -128,10 +189,8 @@ export default function AnomaliesPage() {
              <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">82%</div>
-            <p className="text-xs text-muted-foreground flex items-center">
-                <ArrowUp className="h-3 w-3 mr-1 text-destructive"/> +5% vs mois dernier
-            </p>
+            {loading ? <Skeleton className="h-7 w-16" /> : <div className="text-2xl font-bold">{stats?.tauxResolution}%</div>}
+            <p className="text-xs text-muted-foreground">Sur toutes les anomalies</p>
           </CardContent>
         </Card>
         <Card>
@@ -140,8 +199,8 @@ export default function AnomaliesPage() {
              <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">18</div>
-            <p className="text-xs text-muted-foreground">Dont 5 en retard</p>
+             {loading ? <Skeleton className="h-7 w-12" /> : <div className="text-2xl font-bold">{stats?.anomaliesOuvertes}</div>}
+            <p className="text-xs text-muted-foreground">Actions non clôturées</p>
           </CardContent>
         </Card>
         <Card>
@@ -150,8 +209,8 @@ export default function AnomaliesPage() {
              <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">Nadia Kettani</div>
-            <p className="text-xs text-muted-foreground">Avec 4 CAA ce mois</p>
+            {loading ? <Skeleton className="h-7 w-32" /> : <div className="text-2xl font-bold">{stats?.topAnimateur.name}</div>}
+            {loading ? <Skeleton className="h-4 w-24 mt-1" /> : <p className="text-xs text-muted-foreground">Avec {stats?.topAnimateur.count} CAA</p>}
           </CardContent>
         </Card>
       </div>
@@ -195,14 +254,16 @@ export default function AnomaliesPage() {
                 <CardDescription>Nombre d'anomalies signalées au cours des 6 derniers mois.</CardDescription>
             </CardHeader>
             <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={anomaliesByMonth}>
-                        <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                        <Tooltip />
-                        <Bar dataKey="Anomalies" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                </ResponsiveContainer>
+                {loading || !stats ? <Skeleton className="w-full h-[300px]" /> :
+                    <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={stats.anomaliesParMois}>
+                            <XAxis dataKey="name" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                            <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                            <Tooltip />
+                            <Bar dataKey="Anomalies" fill="hsl(var(--accent))" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                }
             </CardContent>
         </Card>
       </div>
