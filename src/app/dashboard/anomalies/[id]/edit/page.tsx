@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore"
+import { doc, getDoc, updateDoc, Timestamp, collection, getDocs, query, where } from "firebase/firestore"
 
 const chasseAuxAnomaliesSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -45,7 +45,6 @@ const chasseAuxAnomaliesSchema = z.object({
 
 type ChasseAuxAnomaliesFormValues = z.infer<typeof chasseAuxAnomaliesSchema>
 
-const famillesDeRisque = ["Chute de plain-pied", "Heurt", "Risque chimique", "Risque électrique", "Manutention manuelle", "Autre"];
 const criticites = ["Mineure", "Moyenne", "Majeure", "Critique"];
 const statutsAvancement = ["En cours", "Réalisée", "Non réalisée"];
 
@@ -57,12 +56,55 @@ export default function EditChasseAuxAnomaliesPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
+  
+  const [zones, setZones] = useState<string[]>([]);
+  const [postes, setPostes] = useState<string[]>([]);
+  const [activites, setActivites] = useState<string[]>([]);
+  const [familles, setFamilles] = useState<string[]>([]);
+  const [loadingLists, setLoadingLists] = useState(true);
 
   const form = useForm<ChasseAuxAnomaliesFormValues>({
     resolver: zodResolver(chasseAuxAnomaliesSchema),
     defaultValues: {},
   })
   
+    useEffect(() => {
+        const fetchLists = async () => {
+            setLoadingLists(true);
+            try {
+                const fetchData = async (collectionName: string) => {
+                    const q = query(collection(db, collectionName), where("actif", "==", true));
+                    const snapshot = await getDocs(q);
+                    return snapshot.docs.map(doc => doc.data().nom as string);
+                };
+
+                const [zonesData, postesData, activitesData, famillesData] = await Promise.all([
+                    fetchData("zonesDeTravail"),
+                    fetchData("postesDeTravail"),
+                    fetchData("activitesObservees"),
+                    fetchData("famillesDeRisque")
+                ]);
+                
+                setZones(zonesData);
+                setPostes(postesData);
+                setActivites(activitesData);
+                setFamilles(famillesData);
+
+            } catch (error) {
+                console.error("Error fetching lists: ", error);
+                toast({
+                    variant: "destructive",
+                    title: "Erreur de chargement",
+                    description: "Impossible de charger les listes de sélection.",
+                });
+            } finally {
+                setLoadingLists(false);
+            }
+        };
+
+        fetchLists();
+    }, [toast]);
+
   useEffect(() => {
     if (!id) return;
 
@@ -182,13 +224,31 @@ export default function EditChasseAuxAnomaliesPage() {
                   </FormItem>
                 )} />
               <FormField control={form.control} name="activite" render={({ field }) => (
-                  <FormItem><FormLabel>Activité observée</FormLabel><FormControl><Input placeholder="Ex: Rangement d'atelier" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Activité observée</FormLabel>
+                     <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                        <SelectContent>{activites.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
                 )} />
               <FormField control={form.control} name="zone" render={({ field }) => (
-                  <FormItem><FormLabel>Zone / Unité</FormLabel><FormControl><Input placeholder="Ex: Atelier de production" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Zone / Unité</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                        <SelectContent>{zones.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
                 )} />
               <FormField control={form.control} name="poste" render={({ field }) => (
-                  <FormItem><FormLabel>Poste de travail</FormLabel><FormControl><Input placeholder="Ex: Opérateur machine" {...field} /></FormControl><FormMessage /></FormItem>
+                  <FormItem><FormLabel>Poste de travail</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                        <SelectContent>{postes.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
                 )} />
               <FormField control={form.control} name="animateur" render={({ field }) => (
                   <FormItem><FormLabel>Animateur</FormLabel><FormControl><Input {...field} readOnly /></FormControl><FormMessage /></FormItem>
@@ -217,15 +277,15 @@ export default function EditChasseAuxAnomaliesPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField control={form.control} name={`anomalies.${index}.famille`} render={({ field }) => (
                                 <FormItem><FormLabel>Famille de risque</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
-                                    <SelectContent>{famillesDeRisque.map(famille => <SelectItem key={famille} value={famille}>{famille}</SelectItem>)}</SelectContent>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                    <SelectContent>{familles.map(famille => <SelectItem key={famille} value={famille}>{famille}</SelectItem>)}</SelectContent>
                                     </Select><FormMessage />
                                 </FormItem>
                             )} />
                              <FormField control={form.control} name={`anomalies.${index}.criticite`} render={({ field }) => (
                                 <FormItem><FormLabel>Criticité</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
                                     <SelectContent>{criticites.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                                     </Select><FormMessage />
@@ -255,7 +315,7 @@ export default function EditChasseAuxAnomaliesPage() {
                             )} />
                             <FormField control={form.control} name={`anomalies.${index}.avancement`} render={({ field }) => (
                                 <FormItem><FormLabel>Avancement</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
                                     <SelectContent>{statutsAvancement.map(statut => <SelectItem key={statut} value={statut}>{statut}</SelectItem>)}</SelectContent>
                                     </Select><FormMessage />
@@ -303,3 +363,5 @@ export default function EditChasseAuxAnomaliesPage() {
     </div>
   )
 }
+
+    

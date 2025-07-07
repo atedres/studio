@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast"
 import { format } from "date-fns"
 import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
-import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore"
+import { doc, getDoc, updateDoc, Timestamp, collection, getDocs, query, where } from "firebase/firestore"
 
 const dialogueSecuriteSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -48,8 +48,6 @@ const dialogueSecuriteSchema = z.object({
 
 type DialogueSecuriteFormValues = z.infer<typeof dialogueSecuriteSchema>
 
-const famillesDeRisque = ["Chute de plain-pied", "Heurt", "Risque chimique", "Risque électrique", "Manutention manuelle", "Autre"];
-
 export default function EditDialogueSecuritePage() {
     const { toast } = useToast()
     const router = useRouter()
@@ -59,10 +57,53 @@ export default function EditDialogueSecuritePage() {
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [loading, setLoading] = useState(true)
 
+    const [zones, setZones] = useState<string[]>([]);
+    const [postes, setPostes] = useState<string[]>([]);
+    const [activites, setActivites] = useState<string[]>([]);
+    const [familles, setFamilles] = useState<string[]>([]);
+    const [loadingLists, setLoadingLists] = useState(true);
+
     const form = useForm<DialogueSecuriteFormValues>({
         resolver: zodResolver(dialogueSecuriteSchema),
         defaultValues: {},
     })
+
+    useEffect(() => {
+        const fetchLists = async () => {
+            setLoadingLists(true);
+            try {
+                const fetchData = async (collectionName: string) => {
+                    const q = query(collection(db, collectionName), where("actif", "==", true));
+                    const snapshot = await getDocs(q);
+                    return snapshot.docs.map(doc => doc.data().nom as string);
+                };
+
+                const [zonesData, postesData, activitesData, famillesData] = await Promise.all([
+                    fetchData("zonesDeTravail"),
+                    fetchData("postesDeTravail"),
+                    fetchData("activitesObservees"),
+                    fetchData("famillesDeRisque")
+                ]);
+                
+                setZones(zonesData);
+                setPostes(postesData);
+                setActivites(activitesData);
+                setFamilles(famillesData);
+
+            } catch (error) {
+                console.error("Error fetching lists: ", error);
+                toast({
+                    variant: "destructive",
+                    title: "Erreur de chargement",
+                    description: "Impossible de charger les listes de sélection.",
+                });
+            } finally {
+                setLoadingLists(false);
+            }
+        };
+
+        fetchLists();
+    }, [toast]);
 
     useEffect(() => {
         if (!id) return;
@@ -170,13 +211,31 @@ export default function EditDialogueSecuritePage() {
                                 <FormItem><FormLabel>Observateur</FormLabel><FormControl><Input {...field} readOnly /></FormControl><FormMessage /></FormItem>
                             )} />
                             <FormField control={form.control} name="activite" render={({ field }) => (
-                                <FormItem><FormLabel>Activité observée</FormLabel><FormControl><Input placeholder="Ex: Maintenance préventive" {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Activité observée</FormLabel>
+                                     <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                        <SelectContent>{activites.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
                             )} />
                             <FormField control={form.control} name="zone" render={({ field }) => (
-                                <FormItem><FormLabel>Zone / Unité</FormLabel><FormControl><Input placeholder="Ex: Atelier de production" {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Zone / Unité</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                        <SelectContent>{zones.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
                             )} />
                             <FormField control={form.control} name="poste" render={({ field }) => (
-                                <FormItem><FormLabel>Poste de travail</FormLabel><FormControl><Input placeholder="Ex: Opérateur machine" {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Poste de travail</FormLabel>
+                                     <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                        <SelectContent>{postes.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
                             )} />
                             <FormField control={form.control} name="nombrePersonnes" render={({ field }) => (
                                 <FormItem><FormLabel>Nombre de personnes</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
@@ -206,8 +265,14 @@ export default function EditDialogueSecuritePage() {
                                 <div key={field.id} className="p-4 border rounded-lg space-y-4 relative">
                                     <h4 className="font-semibold">Anomalie n°{index + 1}</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                       <FormField control={form.control} name={`anomalies.${index}.type`} render={({ field }) => (<FormItem><FormLabel>Type d'anomalie</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="AD">Acte Dangereux (AD)</SelectItem><SelectItem value="IS">Situation Dangereuse (IS)</SelectItem><SelectItem value="SD">Système Défaillant (SD)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name={`anomalies.${index}.familleRisque`} render={({ field }) => (<FormItem><FormLabel>Famille de risque</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl><SelectContent>{famillesDeRisque.map(famille => <SelectItem key={famille} value={famille}>{famille}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                                       <FormField control={form.control} name={`anomalies.${index}.type`} render={({ field }) => (<FormItem><FormLabel>Type d'anomalie</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="AD">Acte Dangereux (AD)</SelectItem><SelectItem value="IS">Situation Dangereuse (IS)</SelectItem><SelectItem value="SD">Système Défaillant (SD)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                                        <FormField control={form.control} name={`anomalies.${index}.familleRisque`} render={({ field }) => (<FormItem><FormLabel>Famille de risque</FormLabel>
+                                            <Select onValueChange={field.onChange} value={field.value}>
+                                                <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                                <SelectContent>{familles.map(famille => <SelectItem key={famille} value={famille}>{famille}</SelectItem>)}</SelectContent>
+                                            </Select>
+                                            <FormMessage />
+                                        </FormItem>)} />
                                     </div>
                                      <FormField control={form.control} name={`anomalies.${index}.description`} render={({ field }) => (<FormItem><FormLabel>Description de l'anomalie</FormLabel><FormControl><Textarea placeholder="Décrivez précisément l'anomalie..." {...field} /></FormControl><FormMessage /></FormItem>)} />
                                     <FormField control={form.control} name={`anomalies.${index}.actionsImmediates`} render={({ field }) => (<FormItem><FormLabel>Actions immédiates</FormLabel><FormControl><Textarea placeholder="Quelles actions ont été prises sur le champ ?" {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -216,7 +281,7 @@ export default function EditDialogueSecuritePage() {
                                         <FormField control={form.control} name={`anomalies.${index}.responsable`} render={({ field }) => (<FormItem><FormLabel>Responsable</FormLabel><FormControl><Input placeholder="Nom du responsable" {...field} /></FormControl><FormMessage /></FormItem>)} />
                                          <FormField control={form.control} name={`anomalies.${index}.garant`} render={({ field }) => (<FormItem><FormLabel>Garant</FormLabel><FormControl><Input placeholder="Nom du garant" {...field} /></FormControl><FormMessage /></FormItem>)} />
                                         <FormField control={form.control} name={`anomalies.${index}.echeance`} render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Échéance</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Choisir une date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name={`anomalies.${index}.statut`} render={({ field }) => (<FormItem><FormLabel>Statut</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="En cours">En cours</SelectItem><SelectItem value="Réalisée">Réalisée</SelectItem><SelectItem value="Non réalisée">Non réalisée</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                                        <FormField control={form.control} name={`anomalies.${index}.statut`} render={({ field }) => (<FormItem><FormLabel>Statut</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="En cours">En cours</SelectItem><SelectItem value="Réalisée">Réalisée</SelectItem><SelectItem value="Non réalisée">Non réalisée</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
                                     </div>
                                     <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2" onClick={() => removeAnomalie(index)}><Trash2 className="h-4 w-4" /></Button>
                                 </div>
@@ -241,5 +306,7 @@ export default function EditDialogueSecuritePage() {
         </div>
     )
 }
+
+    
 
     
