@@ -42,7 +42,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { User, Bell, Lock, Users, Loader2, UserPlus } from "lucide-react"
+import { User, Bell, Lock, Users, Loader2, UserPlus, Edit } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -70,6 +70,15 @@ const userCreationSchema = z.object({
 
 type UserCreationFormValues = z.infer<typeof userCreationSchema>;
 
+const userEditSchema = z.object({
+  firstName: z.string().min(1, "Le prénom est requis."),
+  lastName: z.string().min(1, "Le nom est requis."),
+  position: z.string().min(1, "Le poste est requis."),
+  entity: z.string().min(1, "L'entité est requise."),
+});
+type UserEditFormValues = z.infer<typeof userEditSchema>;
+
+
 const profileSchema = z.object({
   firstName: z.string().min(1, "Le prénom est requis."),
   lastName: z.string().min(1, "Le nom de famille est requis."),
@@ -92,7 +101,11 @@ const UserManagementCard = () => {
   const [users, setUsers] = useState<AppUserDoc[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+  const [isEditUserOpen, setIsEditUserOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<AppUserDoc | null>(null);
   const { toast } = useToast();
+  const { updateUserDocument } = useAuth();
+
 
   const userCreationForm = useForm<UserCreationFormValues>({
     resolver: zodResolver(userCreationSchema),
@@ -105,6 +118,10 @@ const UserManagementCard = () => {
         entity: "",
         role: "niveau1",
     }
+  });
+
+  const userEditForm = useForm<UserEditFormValues>({
+    resolver: zodResolver(userEditSchema),
   });
 
   useEffect(() => {
@@ -144,6 +161,43 @@ const UserManagementCard = () => {
         variant: "destructive",
         title: "Erreur",
         description: "Impossible de mettre à jour le rôle.",
+      });
+    }
+  };
+  
+  const handleEditClick = (user: AppUserDoc) => {
+    setEditingUser(user);
+    userEditForm.reset({
+      firstName: user.firstName,
+      lastName: user.lastName,
+      position: user.position,
+      entity: user.entity,
+    });
+    setIsEditUserOpen(true);
+  };
+
+  const handleUpdateUser = async (values: UserEditFormValues) => {
+    if (!editingUser || !updateUserDocument) return;
+
+    try {
+      await updateUserDocument(editingUser.id, values);
+      setUsers(prevUsers => 
+        prevUsers.map(u => 
+          u.id === editingUser.id ? { ...u, ...values, displayName: `${values.firstName} ${values.lastName}` } : u
+        )
+      );
+      toast({
+        title: "Utilisateur mis à jour",
+        description: `Les informations pour ${editingUser.email} ont été mises à jour.`,
+      });
+      setIsEditUserOpen(false);
+      setEditingUser(null);
+    } catch (error) {
+      console.error("Error updating user: ", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur de mise à jour",
+        description: "Impossible de mettre à jour l'utilisateur.",
       });
     }
   };
@@ -227,7 +281,7 @@ const UserManagementCard = () => {
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
             <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Gestion des Utilisateurs</CardTitle>
-            <CardDescription>Attribuez des rôles aux utilisateurs pour gérer leurs permissions.</CardDescription>
+            <CardDescription>Attribuez des rôles et modifiez les profils des utilisateurs.</CardDescription>
         </div>
         <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
             <DialogTrigger asChild>
@@ -291,8 +345,8 @@ const UserManagementCard = () => {
             <TableRow>
               <TableHead>Nom & Prénom</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead>Poste</TableHead>
               <TableHead>Rôle</TableHead>
+              <TableHead>Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -301,16 +355,18 @@ const UserManagementCard = () => {
                 <TableRow key={i}>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-10 w-32" /></TableCell>
+                  <TableCell><Skeleton className="h-10 w-10" /></TableCell>
                 </TableRow>
               ))
             ) : (
               users.map(u => (
                 <TableRow key={u.id}>
-                  <TableCell>{u.displayName}</TableCell>
+                  <TableCell>
+                      <div className="font-medium">{u.displayName}</div>
+                      <div className="text-sm text-muted-foreground">{u.position} ({u.entity})</div>
+                  </TableCell>
                   <TableCell>{u.email}</TableCell>
-                  <TableCell>{u.position}</TableCell>
                   <TableCell>
                     <Select value={u.role} onValueChange={(value) => handleRoleChange(u.id, value)}>
                       <SelectTrigger className="w-[180px]">
@@ -326,11 +382,51 @@ const UserManagementCard = () => {
                       </SelectContent>
                     </Select>
                   </TableCell>
+                  <TableCell>
+                      <Button variant="ghost" size="icon" onClick={() => handleEditClick(u)}>
+                          <Edit className="h-4 w-4" />
+                          <span className="sr-only">Modifier</span>
+                      </Button>
+                  </TableCell>
                 </TableRow>
               ))
             )}
           </TableBody>
         </Table>
+        <Dialog open={isEditUserOpen} onOpenChange={setIsEditUserOpen}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Modifier l'utilisateur</DialogTitle>
+                    <DialogDescription>Mettez à jour les informations de {editingUser?.email}.</DialogDescription>
+                </DialogHeader>
+                <Form {...userEditForm}>
+                    <form onSubmit={userEditForm.handleSubmit(handleUpdateUser)} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField control={userEditForm.control} name="lastName" render={({ field }) => (
+                                <FormItem><FormLabel>Nom</FormLabel><FormControl><Input placeholder="Dupont" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            <FormField control={userEditForm.control} name="firstName" render={({ field }) => (
+                                <FormItem><FormLabel>Prénom</FormLabel><FormControl><Input placeholder="Jean" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField control={userEditForm.control} name="position" render={({ field }) => (
+                                <FormItem><FormLabel>Poste</FormLabel><FormControl><Input placeholder="Opérateur" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            <FormField control={userEditForm.control} name="entity" render={({ field }) => (
+                                <FormItem><FormLabel>Entité</FormLabel><FormControl><Input placeholder="Production" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                        </div>
+                        <DialogFooter>
+                            <Button type="submit" disabled={userEditForm.formState.isSubmitting}>
+                                {userEditForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Enregistrer les modifications
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
@@ -578,3 +674,5 @@ export default function SettingsPage() {
     </div>
   )
 }
+
+    

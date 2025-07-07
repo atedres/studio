@@ -13,7 +13,7 @@ import {
   updatePassword as firebaseUpdatePassword,
 } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, query, limit, writeBatch } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, query, limit, writeBatch, updateDoc } from "firebase/firestore";
 import { useRouter } from 'next/navigation';
 
 export type AppUser = User & {
@@ -31,6 +31,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateUserProfile?: (data: { displayName: string; firstName: string; lastName: string }) => Promise<void>;
   updateUserPassword?: (oldPass: string, newPass: string) => Promise<void>;
+  updateUserDocument?: (userId: string, data: { firstName: string; lastName:string; position:string; entity:string; }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -176,6 +177,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateUserDocument = async (userId: string, data: { firstName: string; lastName: string; position: string; entity: string; }) => {
+    const userDocRef = doc(db, 'users', userId);
+    const displayName = `${data.firstName} ${data.lastName}`;
+    await updateDoc(userDocRef, {
+        ...data,
+        displayName,
+    });
+  };
+
   const signOut = async () => {
     await firebaseSignOut(auth);
     router.push('/');
@@ -188,6 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     signOut,
     updateUserProfile,
     updateUserPassword,
+    updateUserDocument,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -200,3 +211,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+    
