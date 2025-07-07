@@ -44,6 +44,8 @@ export default function NewReunionPage() {
   const { user } = useAuth()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
+
 
   const form = useForm<ReunionFormValues>({
     resolver: zodResolver(reunionSchema),
@@ -177,7 +179,8 @@ export default function NewReunionPage() {
                     <FormField control={form.control} name="date" render={({ field }) => (
                         <FormItem className="flex flex-col">
                             <FormLabel>Date de la réunion</FormLabel>
-                            <Popover><PopoverTrigger asChild>
+                            <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                              <PopoverTrigger asChild>
                                 <FormControl>
                                 <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
                                     {field.value ? format(field.value, "PPP") : <span>Choisir une date</span>}
@@ -185,7 +188,10 @@ export default function NewReunionPage() {
                                 </Button>
                                 </FormControl>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar mode="single" selected={field.value} onSelect={(date) => {field.onChange(date); setIsDatePickerOpen(false);}} initialFocus />
+                            </PopoverContent>
+                          </Popover>
                             <FormMessage />
                         </FormItem>
                     )} />

@@ -56,6 +56,9 @@ export default function EditDialogueSecuritePage() {
 
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [loading, setLoading] = useState(true)
+    const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
+    const [openEcheancePopovers, setOpenEcheancePopovers] = useState<Record<number, boolean>>({})
+
 
     const [zones, setZones] = useState<string[]>([]);
     const [postes, setPostes] = useState<string[]>([]);
@@ -205,7 +208,22 @@ export default function EditDialogueSecuritePage() {
                         </CardHeader>
                         <CardContent className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                              <FormField control={form.control} name="date" render={({ field }) => (
-                                <FormItem className="flex flex-col"><FormLabel>Date du dialogue</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Choisir une date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>
+                                <FormItem className="flex flex-col"><FormLabel>Date du dialogue</FormLabel>
+                                  <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                                    <PopoverTrigger asChild>
+                                      <FormControl>
+                                        <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                                          {field.value ? format(field.value, "PPP") : <span>Choisir une date</span>}
+                                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                        </Button>
+                                      </FormControl>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                      <Calendar mode="single" selected={field.value} onSelect={(date) => {field.onChange(date); setIsDatePickerOpen(false);}} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
+                                    </PopoverContent>
+                                  </Popover>
+                                <FormMessage />
+                               </FormItem>
                             )} />
                             <FormField control={form.control} name="observateur" render={({ field }) => (
                                 <FormItem><FormLabel>Observateur</FormLabel><FormControl><Input {...field} readOnly /></FormControl><FormMessage /></FormItem>
@@ -280,7 +298,22 @@ export default function EditDialogueSecuritePage() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         <FormField control={form.control} name={`anomalies.${index}.responsable`} render={({ field }) => (<FormItem><FormLabel>Responsable</FormLabel><FormControl><Input placeholder="Nom du responsable" {...field} /></FormControl><FormMessage /></FormItem>)} />
                                          <FormField control={form.control} name={`anomalies.${index}.garant`} render={({ field }) => (<FormItem><FormLabel>Garant</FormLabel><FormControl><Input placeholder="Nom du garant" {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                        <FormField control={form.control} name={`anomalies.${index}.echeance`} render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Échéance</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? format(field.value, "PPP") : <span>Choisir une date</span>}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />
+                                        <FormField control={form.control} name={`anomalies.${index}.echeance`} render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>Échéance</FormLabel>
+                                          <Popover open={openEcheancePopovers[index]} onOpenChange={(isOpen) => setOpenEcheancePopovers(prev => ({...prev, [index]: isOpen}))}>
+                                            <PopoverTrigger asChild>
+                                              <FormControl>
+                                                <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
+                                                  {field.value ? format(field.value, "PPP") : <span>Choisir une date</span>}
+                                                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                                </Button>
+                                              </FormControl>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                              <Calendar mode="single" selected={field.value} onSelect={(date) => {field.onChange(date); setOpenEcheancePopovers(prev => ({...prev, [index]: false}))}} initialFocus />
+                                            </PopoverContent>
+                                          </Popover>
+                                          <FormMessage />
+                                        </FormItem>)} />
                                         <FormField control={form.control} name={`anomalies.${index}.statut`} render={({ field }) => (<FormItem><FormLabel>Statut</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="En cours">En cours</SelectItem><SelectItem value="Réalisée">Réalisée</SelectItem><SelectItem value="Non réalisée">Non réalisée</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
                                     </div>
                                     <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2" onClick={() => removeAnomalie(index)}><Trash2 className="h-4 w-4" /></Button>

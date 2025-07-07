@@ -54,6 +54,9 @@ export default function NewChasseAuxAnomaliesPage() {
   const { user } = useAuth()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false)
+  const [openEcheancePopovers, setOpenEcheancePopovers] = React.useState<Record<number, boolean>>({})
+
 
   const [zones, setZones] = useState<string[]>([]);
   const [postes, setPostes] = useState<string[]>([]);
@@ -219,7 +222,8 @@ export default function NewChasseAuxAnomaliesPage() {
               <FormField control={form.control} name="date" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel>Date de la CAA</FormLabel>
-                    <Popover><PopoverTrigger asChild>
+                    <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                      <PopoverTrigger asChild>
                         <FormControl>
                           <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
                             {field.value ? format(field.value, "PPP") : <span>Choisir une date</span>}
@@ -228,8 +232,9 @@ export default function NewChasseAuxAnomaliesPage() {
                         </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar mode="single" selected={field.value} onSelect={field.onChange} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
-                    </PopoverContent></Popover>
+                        <Calendar mode="single" selected={field.value} onSelect={(date) => {field.onChange(date); setIsDatePickerOpen(false);}} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
+                    </PopoverContent>
+                  </Popover>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -312,7 +317,8 @@ export default function NewChasseAuxAnomaliesPage() {
                             )} />
                             <FormField control={form.control} name={`anomalies.${index}.echeance`} render={({ field }) => (
                                 <FormItem className="flex flex-col"><FormLabel>Échéance</FormLabel>
-                                <Popover><PopoverTrigger asChild>
+                                <Popover open={openEcheancePopovers[index]} onOpenChange={(isOpen) => setOpenEcheancePopovers(prev => ({...prev, [index]: isOpen}))}>
+                                  <PopoverTrigger asChild>
                                     <FormControl>
                                     <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>
                                         {field.value ? format(field.value, "PPP") : <span>Choisir une date</span>}
@@ -320,7 +326,10 @@ export default function NewChasseAuxAnomaliesPage() {
                                     </Button>
                                     </FormControl>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage />
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar mode="single" selected={field.value} onSelect={(date) => {field.onChange(date); setOpenEcheancePopovers(prev => ({...prev, [index]: false}))}} initialFocus />
+                                </PopoverContent>
+                              </Popover><FormMessage />
                                 </FormItem>
                             )} />
                             <FormField control={form.control} name={`anomalies.${index}.avancement`} render={({ field }) => (
