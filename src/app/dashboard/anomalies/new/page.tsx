@@ -235,7 +235,7 @@ export default function NewChasseAuxAnomaliesPage() {
                 )} />
               <FormField control={form.control} name="activite" render={({ field }) => (
                   <FormItem><FormLabel>Activité observée</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
                         <SelectContent>{activites.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                     </Select>
@@ -244,7 +244,7 @@ export default function NewChasseAuxAnomaliesPage() {
                 )} />
               <FormField control={form.control} name="zone" render={({ field }) => (
                   <FormItem><FormLabel>Zone / Unité</FormLabel>
-                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                     <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
                         <SelectContent>{zones.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                     </Select>
@@ -253,7 +253,7 @@ export default function NewChasseAuxAnomaliesPage() {
                 )} />
               <FormField control={form.control} name="poste" render={({ field }) => (
                   <FormItem><FormLabel>Poste de travail</FormLabel>
-                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                     <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
                         <SelectContent>{postes.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                     </Select>
@@ -287,7 +287,7 @@ export default function NewChasseAuxAnomaliesPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField control={form.control} name={`anomalies.${index}.famille`} render={({ field }) => (
                                <FormItem><FormLabel>Famille de risque</FormLabel>
-                                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                   <Select onValueChange={field.onChange} value={field.value}>
                                    <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
                                    <SelectContent>{familles.map(famille => <SelectItem key={famille} value={famille}>{famille}</SelectItem>)}</SelectContent>
                                    </Select><FormMessage />
@@ -295,7 +295,7 @@ export default function NewChasseAuxAnomaliesPage() {
                            )} />
                            <FormField control={form.control} name={`anomalies.${index}.criticite`} render={({ field }) => (
                                 <FormItem><FormLabel>Criticité</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
                                     <SelectContent>{criticites.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                                     </Select><FormMessage />
@@ -325,7 +325,7 @@ export default function NewChasseAuxAnomaliesPage() {
                             )} />
                             <FormField control={form.control} name={`anomalies.${index}.avancement`} render={({ field }) => (
                                 <FormItem><FormLabel>Avancement</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
                                     <SelectContent>{statutsAvancement.map(statut => <SelectItem key={statut} value={statut}>{statut}</SelectItem>)}</SelectContent>
                                     </Select><FormMessage />
@@ -377,5 +377,3 @@ export default function NewChasseAuxAnomaliesPage() {
     </div>
   )
 }
-
-    

@@ -240,7 +240,7 @@ export default function NewDialogueSecuritePage() {
               <FormField control={form.control} name="activite" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Activité observée</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
                         <SelectContent>{activites.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                     </Select>
@@ -250,7 +250,7 @@ export default function NewDialogueSecuritePage() {
               <FormField control={form.control} name="zone" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Zone / Unité</FormLabel>
-                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                     <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
                         <SelectContent>{zones.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                     </Select>
@@ -260,7 +260,7 @@ export default function NewDialogueSecuritePage() {
               <FormField control={form.control} name="poste" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Poste de travail</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
                         <SelectContent>{postes.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                     </Select>
@@ -330,7 +330,7 @@ export default function NewDialogueSecuritePage() {
                            <FormField control={form.control} name={`anomalies.${index}.type`} render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Type d'anomalie</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="AD">Acte Dangereux (AD)</SelectItem>
@@ -344,7 +344,7 @@ export default function NewDialogueSecuritePage() {
                             <FormField control={form.control} name={`anomalies.${index}.familleRisque`} render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Famille de risque</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         {familles.map(famille => <SelectItem key={famille} value={famille}>{famille}</SelectItem>)}
@@ -394,7 +394,7 @@ export default function NewDialogueSecuritePage() {
                             <FormField control={form.control} name={`anomalies.${index}.statut`} render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Statut</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="En cours">En cours</SelectItem>
@@ -447,5 +447,3 @@ export default function NewDialogueSecuritePage() {
     </div>
   )
 }
-
-    
