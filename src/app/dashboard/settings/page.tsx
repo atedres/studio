@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useForm } from "react-hook-form"
 import { db, auth } from "@/lib/firebase"
-import { collection, getDocs, doc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore"
+import { collection, getDocs, doc, updateDoc, setDoc, serverTimestamp, query, where } from "firebase/firestore"
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
@@ -106,6 +106,9 @@ const UserManagementCard = () => {
   const { toast } = useToast();
   const { updateUserDocument } = useAuth();
 
+  const [postes, setPostes] = useState<string[]>([]);
+  const [entites, setEntites] = useState<string[]>([]);
+  const [loadingLists, setLoadingLists] = useState(true);
 
   const userCreationForm = useForm<UserCreationFormValues>({
     resolver: zodResolver(userCreationSchema),
@@ -151,6 +154,40 @@ const UserManagementCard = () => {
     };
     fetchUsers();
   }, [toast]);
+
+  useEffect(() => {
+    const fetchLists = async () => {
+        setLoadingLists(true);
+        try {
+            const fetchData = async (collectionName: string) => {
+                const q = query(collection(db, collectionName), where("actif", "==", true));
+                const snapshot = await getDocs(q);
+                return snapshot.docs.map(doc => doc.data().nom as string);
+            };
+
+            const [postesData, entitesData] = await Promise.all([
+                fetchData("postesDeTravail"),
+                fetchData("zonesDeTravail") // 'Entité' corresponds to 'zonesDeTravail'
+            ]);
+            
+            setPostes(postesData);
+            setEntites(entitesData);
+
+        } catch (error) {
+            console.error("Error fetching lists for settings: ", error);
+            toast({
+                variant: "destructive",
+                title: "Erreur de chargement",
+                description: "Impossible de charger les listes pour les postes et entités.",
+            });
+        } finally {
+            setLoadingLists(false);
+        }
+    };
+
+    fetchLists();
+  }, [toast]);
+
 
   const handleRoleChange = async (userId: string, newRole: string) => {
     const userDocRef = doc(db, "users", userId);
@@ -317,11 +354,37 @@ const UserManagementCard = () => {
                             <FormItem><FormLabel>Mot de passe temporaire</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
                         )}/>
                         <div className="grid grid-cols-2 gap-4">
-                            <FormField control={userCreationForm.control} name="position" render={({ field }) => (
-                                <FormItem><FormLabel>Poste</FormLabel><FormControl><Input placeholder="Opérateur" {...field} /></FormControl><FormMessage /></FormItem>
+                             <FormField control={userCreationForm.control} name="position" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Poste</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingLists}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner un poste"} />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {postes.map(poste => <SelectItem key={poste} value={poste}>{poste}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
                             )}/>
                             <FormField control={userCreationForm.control} name="entity" render={({ field }) => (
-                                <FormItem><FormLabel>Entité</FormLabel><FormControl><Input placeholder="Production" {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem>
+                                    <FormLabel>Entité</FormLabel>
+                                    <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingLists}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner une entité"} />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {entites.map(entite => <SelectItem key={entite} value={entite}>{entite}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
                             )}/>
                         </div>
                         <FormField control={userCreationForm.control} name="role" render={({ field }) => (
@@ -417,10 +480,36 @@ const UserManagementCard = () => {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                             <FormField control={userEditForm.control} name="position" render={({ field }) => (
-                                <FormItem><FormLabel>Poste</FormLabel><FormControl><Input placeholder="Opérateur" {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem>
+                                    <FormLabel>Poste</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingLists}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner un poste"} />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {postes.map(poste => <SelectItem key={poste} value={poste}>{poste}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
                             )}/>
                             <FormField control={userEditForm.control} name="entity" render={({ field }) => (
-                                <FormItem><FormLabel>Entité</FormLabel><FormControl><Input placeholder="Production" {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem>
+                                    <FormLabel>Entité</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value} disabled={loadingLists}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner une entité"} />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            {entites.map(entite => <SelectItem key={entite} value={entite}>{entite}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
                             )}/>
                         </div>
                         <DialogFooter>
@@ -680,7 +769,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-
-    
-
-    
