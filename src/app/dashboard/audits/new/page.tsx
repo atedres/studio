@@ -22,6 +22,7 @@ import { format } from "date-fns"
 import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore"
+import { AutocompleteInput } from '@/components/ui/autocomplete-input'
 
 const dialogueSecuriteSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -63,6 +64,9 @@ export default function NewDialogueSecuritePage() {
   const [familles, setFamilles] = useState<string[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
 
+  const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
+  const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
+
   const form = useForm<DialogueSecuriteFormValues>({
     resolver: zodResolver(dialogueSecuriteSchema),
     defaultValues: {
@@ -70,6 +74,7 @@ export default function NewDialogueSecuritePage() {
       date: new Date(),
       comportementsPositifs: [{ value: "" }],
       anomalies: [],
+      identification: "",
     },
   })
 
@@ -83,17 +88,20 @@ export default function NewDialogueSecuritePage() {
                 return snapshot.docs.map(doc => doc.data().nom as string);
             };
 
-            const [zonesData, postesData, activitesData, famillesData] = await Promise.all([
-                fetchData("zonesDeTravail"),
-                fetchData("postesDeTravail"),
-                fetchData("activitesObservees"),
-                fetchData("famillesDeRisque")
+            const fetchUsers = async () => {
+                const usersCollection = collection(db, "users");
+                const usersSnapshot = await getDocs(usersCollection);
+                const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as { id: string, displayName: string }[];
+                setUsers(usersList);
+            };
+
+            await Promise.all([
+                fetchData("zonesDeTravail").then(setZones),
+                fetchData("postesDeTravail").then(setPostes),
+                fetchData("activitesObservees").then(setActivites),
+                fetchData("famillesDeRisque").then(setFamilles),
+                fetchUsers()
             ]);
-            
-            setZones(zonesData);
-            setPostes(postesData);
-            setActivites(activitesData);
-            setFamilles(famillesData);
 
         } catch (error) {
             console.error("Error fetching lists: ", error);
@@ -280,7 +288,14 @@ export default function NewDialogueSecuritePage() {
               <FormField control={form.control} name="identification" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Identification (Nom ou matricule)</FormLabel>
-                    <FormControl><Input placeholder="Nom ou matricule de la personne observée" {...field} /></FormControl>
+                    <FormControl>
+                        <AutocompleteInput
+                          placeholder="Nom ou matricule de la personne observée"
+                          suggestions={userNames}
+                          value={field.value}
+                          onChange={field.onChange}
+                       />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -374,10 +389,30 @@ export default function NewDialogueSecuritePage() {
                         <h5 className="font-medium pt-2">Plan d'action correctif</h5>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             <FormField control={form.control} name={`anomalies.${index}.responsable`} render={({ field }) => (
-                                <FormItem><FormLabel>Responsable</FormLabel><FormControl><Input placeholder="Nom du responsable" {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Responsable</FormLabel>
+                                  <FormControl>
+                                    <AutocompleteInput
+                                        placeholder="Nom du responsable"
+                                        suggestions={userNames}
+                                        value={field.value || ''}
+                                        onChange={field.onChange}
+                                     />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                             )} />
                              <FormField control={form.control} name={`anomalies.${index}.garant`} render={({ field }) => (
-                                <FormItem><FormLabel>Garant</FormLabel><FormControl><Input placeholder="Nom du garant" {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Garant</FormLabel>
+                                   <FormControl>
+                                     <AutocompleteInput
+                                        placeholder="Nom du garant"
+                                        suggestions={userNames}
+                                        value={field.value || ''}
+                                        onChange={field.onChange}
+                                     />
+                                   </FormControl>
+                                   <FormMessage />
+                                </FormItem>
                             )} />
                             <FormField control={form.control} name={`anomalies.${index}.echeance`} render={({ field }) => (
                                 <FormItem className="flex flex-col"><FormLabel>Échéance</FormLabel>

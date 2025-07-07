@@ -22,6 +22,7 @@ import { format } from "date-fns"
 import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { doc, getDoc, updateDoc, Timestamp, collection, getDocs, query, where } from "firebase/firestore"
+import { AutocompleteInput } from '@/components/ui/autocomplete-input'
 
 const chasseAuxAnomaliesSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -65,6 +66,10 @@ export default function EditChasseAuxAnomaliesPage() {
   const [familles, setFamilles] = useState<string[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
 
+  const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
+  const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
+
+
   const form = useForm<ChasseAuxAnomaliesFormValues>({
     resolver: zodResolver(chasseAuxAnomaliesSchema),
     defaultValues: {},
@@ -79,18 +84,21 @@ export default function EditChasseAuxAnomaliesPage() {
                     const snapshot = await getDocs(q);
                     return snapshot.docs.map(doc => doc.data().nom as string);
                 };
-
-                const [zonesData, postesData, activitesData, famillesData] = await Promise.all([
-                    fetchData("zonesDeTravail"),
-                    fetchData("postesDeTravail"),
-                    fetchData("activitesObservees"),
-                    fetchData("famillesDeRisque")
-                ]);
                 
-                setZones(zonesData);
-                setPostes(postesData);
-                setActivites(activitesData);
-                setFamilles(famillesData);
+                 const fetchUsers = async () => {
+                    const usersCollection = collection(db, "users");
+                    const usersSnapshot = await getDocs(usersCollection);
+                    const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as { id: string, displayName: string }[];
+                    setUsers(usersList);
+                };
+
+                await Promise.all([
+                    fetchData("zonesDeTravail").then(setZones),
+                    fetchData("postesDeTravail").then(setPostes),
+                    fetchData("activitesObservees").then(setActivites),
+                    fetchData("famillesDeRisque").then(setFamilles),
+                    fetchUsers()
+                ]);
 
             } catch (error) {
                 console.error("Error fetching lists: ", error);
@@ -118,7 +126,6 @@ export default function EditChasseAuxAnomaliesPage() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         
-        // Convert Firestore Timestamps to JS Date objects
         const transformedData = {
           ...data,
           date: (data.date as Timestamp).toDate(),
@@ -258,7 +265,17 @@ export default function EditChasseAuxAnomaliesPage() {
                   <FormItem><FormLabel>Animateur</FormLabel><FormControl><Input {...field} readOnly /></FormControl><FormMessage /></FormItem>
                 )} />
               <FormField control={form.control} name="garant" render={({ field }) => (
-                  <FormItem><FormLabel>Garant</FormLabel><FormControl><Input placeholder="Nom du garant de la zone" {...field} /></FormControl><FormMessage /></FormItem>
+                 <FormItem><FormLabel>Garant</FormLabel>
+                    <FormControl>
+                      <AutocompleteInput
+                        placeholder="Nom du garant de la zone"
+                        suggestions={userNames}
+                        value={field.value}
+                        onChange={field.onChange}
+                       />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
               <FormField control={form.control} name="participants" render={({ field }) => (
                   <FormItem className="lg:col-span-3"><FormLabel>Participants</FormLabel><FormControl><Textarea placeholder="Listez les noms des participants" {...field} /></FormControl><FormMessage /></FormItem>
@@ -302,7 +319,17 @@ export default function EditChasseAuxAnomaliesPage() {
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FormField control={form.control} name={`anomalies.${index}.responsable`} render={({ field }) => (
-                                <FormItem><FormLabel>Responsable</FormLabel><FormControl><Input placeholder="Nom du responsable" {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Responsable</FormLabel>
+                                  <FormControl>
+                                    <AutocompleteInput
+                                      placeholder="Nom du responsable"
+                                      suggestions={userNames}
+                                      value={field.value || ''}
+                                      onChange={field.onChange}
+                                     />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                             )} />
                             <FormField control={form.control} name={`anomalies.${index}.echeance`} render={({ field }) => (
                                 <FormItem className="flex flex-col"><FormLabel>Échéance</FormLabel>
@@ -371,5 +398,3 @@ export default function EditChasseAuxAnomaliesPage() {
     </div>
   )
 }
-
-    
