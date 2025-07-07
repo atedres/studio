@@ -122,6 +122,12 @@ const UserManagementCard = () => {
 
   const userEditForm = useForm<UserEditFormValues>({
     resolver: zodResolver(userEditSchema),
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      position: '',
+      entity: ''
+    }
   });
 
   useEffect(() => {
@@ -674,5 +680,7 @@ export default function SettingsPage() {
     </div>
   )
 }
+
+    
 
     
