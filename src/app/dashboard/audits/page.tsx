@@ -24,7 +24,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, orderBy } from "firebase/firestore"
+import { collection, getDocs, query, orderBy, where } from "firebase/firestore"
 import { startOfMonth } from 'date-fns'
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts"
 import { useAuth } from "@/hooks/use-auth"
@@ -81,24 +81,6 @@ export default function DialoguesSecuritePage() {
   }, [allDialogues]);
 
   useEffect(() => {
-    const fetchDialogues = async () => {
-        setLoading(true)
-        try {
-            const q = query(collection(db, "dialoguesSecurite"), orderBy("date", "desc"));
-            const querySnapshot = await getDocs(q);
-            const dialoguesData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            })) as Dialogue[];
-            setAllDialogues(dialoguesData);
-            calculateStats(dialoguesData);
-        } catch (error) {
-            console.error("Error fetching dialogues: ", error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const calculateStats = (data: Dialogue[]) => {
         const now = new Date();
         const debutMois = startOfMonth(now);
@@ -137,8 +119,48 @@ export default function DialoguesSecuritePage() {
         });
     }
 
+    const fetchDialogues = async () => {
+        if (!user) return;
+        setLoading(true)
+        try {
+            let dialoguesQuery;
+            const baseQuery = collection(db, "dialoguesSecurite");
+
+            switch (user.role) {
+                case 'niveau1':
+                case 'niveau2':
+                    dialoguesQuery = query(baseQuery, where("createdBy", "==", user.uid), orderBy("date", "desc"));
+                    break;
+                case 'niveau3':
+                case 'niveau4':
+                case 'niveau5':
+                    dialoguesQuery = query(baseQuery, where("zone", "==", user.entity), orderBy("date", "desc"));
+                    break;
+                case 'admin':
+                    dialoguesQuery = query(baseQuery, orderBy("date", "desc"));
+                    break;
+                default:
+                    // Return no results if role is not recognized
+                    dialoguesQuery = query(baseQuery, where("createdBy", "==", "no-one"));
+                    break;
+            }
+
+            const querySnapshot = await getDocs(dialoguesQuery);
+            const dialoguesData = querySnapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as Dialogue[];
+            setAllDialogues(dialoguesData);
+            calculateStats(dialoguesData);
+        } catch (error) {
+            console.error("Error fetching dialogues: ", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     fetchDialogues();
-  }, []);
+  }, [user]);
 
   const getStatusVariant = (status: string) => {
     switch (status) {

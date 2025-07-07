@@ -24,8 +24,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { FilePlus2, TrendingUp, UserCheck, Eye } from "lucide-react"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, orderBy } from "firebase/firestore"
+import { collection, getDocs, query, orderBy, where } from "firebase/firestore"
 import { startOfMonth, subMonths, format, getMonth, getYear } from 'date-fns';
+import { useAuth } from "@/hooks/use-auth"
 
 interface Anomaly {
   avancement: string;
@@ -55,26 +56,9 @@ export default function AnomaliesPage() {
     const [caas, setCaas] = useState<CAA[]>([])
     const [stats, setStats] = useState<AnomalyStats | null>(null)
     const [loading, setLoading] = useState(true)
+    const { user } = useAuth()
 
     useEffect(() => {
-        const fetchCAAs = async () => {
-            setLoading(true);
-            try {
-                const q = query(collection(db, "chassesAuxAnomalies"), orderBy("date", "desc"));
-                const querySnapshot = await getDocs(q);
-                const caasData = querySnapshot.docs.map(doc => ({
-                    id: doc.id,
-                    ...doc.data()
-                })) as CAA[];
-                setCaas(caasData);
-                calculateStats(caasData);
-            } catch (error) {
-                console.error("Error fetching CAAs: ", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
         const calculateStats = (data: CAA[]) => {
             const now = new Date();
             const debutMois = startOfMonth(now);
@@ -133,8 +117,48 @@ export default function AnomaliesPage() {
             });
         }
 
+        const fetchCAAs = async () => {
+            if (!user) return;
+            setLoading(true);
+            try {
+                let caasQuery;
+                const baseQuery = collection(db, "chassesAuxAnomalies");
+
+                switch(user.role) {
+                    case 'niveau1':
+                    case 'niveau2':
+                        caasQuery = query(baseQuery, where("createdBy", "==", user.uid), orderBy("date", "desc"));
+                        break;
+                    case 'niveau3':
+                    case 'niveau4':
+                    case 'niveau5':
+                        caasQuery = query(baseQuery, where("zone", "==", user.entity), orderBy("date", "desc"));
+                        break;
+                    case 'admin':
+                        caasQuery = query(baseQuery, orderBy("date", "desc"));
+                        break;
+                    default:
+                        // Return no results if role is not recognized
+                        caasQuery = query(baseQuery, where("createdBy", "==", "no-one"));
+                        break;
+                }
+                
+                const querySnapshot = await getDocs(caasQuery);
+                const caasData = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                })) as CAA[];
+                setCaas(caasData);
+                calculateStats(caasData);
+            } catch (error) {
+                console.error("Error fetching CAAs: ", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
         fetchCAAs();
-    }, []);
+    }, [user]);
 
 
     const getStatusVariant = (status: string) => {
