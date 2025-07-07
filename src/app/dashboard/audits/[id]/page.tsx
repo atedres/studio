@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Edit, User, CalendarDays, MapPin, ClipboardList, AlertTriangle, ThumbsUp, Users as UsersIcon, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit, User, CalendarDays, MapPin, ClipboardList, AlertTriangle, ThumbsUp, Users as UsersIcon, Trash2, Loader2, CheckCircle, XCircle, MessageSquareWarning } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth';
+import { Separator } from '@/components/ui/separator';
 
 interface Anomaly {
     type: "AD" | "IS" | "SD";
@@ -51,6 +52,10 @@ interface DSDetails {
     anomalies: Anomaly[];
     commentaires: string;
     status: string;
+    validePar?: string;
+    dateValidation?: Timestamp;
+    rejetMotif?: string;
+    demandeCorrectionCommentaire?: string;
 }
 
 export default function DialogueSecuriteDetailPage() {
@@ -108,10 +113,19 @@ export default function DialogueSecuriteDetailPage() {
 
     const getStatusVariant = (status: string) => {
         switch (status) {
-            case "Réalisée": return "default";
-            case "En cours": return "outline";
-            case "Non réalisée": return "destructive";
-            default: return "secondary";
+            case "Validé":
+            case "Clôturée":
+              return "default"
+            case "Brouillon":
+              return "secondary"
+            case "En attente de validation":
+            case "Rejeté":
+              return "destructive"
+            case "Actions correctives ouvertes":
+            case "À corriger":
+              return "outline"
+            default:
+              return "secondary"
         }
     };
 
@@ -154,6 +168,51 @@ export default function DialogueSecuriteDetailPage() {
         );
     }
 
+    const ValidationInfoCard = () => {
+        if (ds.status === 'Validé') {
+            return (
+                <Card className="bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400"><CheckCircle/> Information de Validation</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                        <p><strong>Validé par :</strong> {ds.validePar}</p>
+                        <p><strong>Date :</strong> {ds.dateValidation ? format(ds.dateValidation.toDate(), 'PPP p', { locale: fr }) : 'N/A'}</p>
+                    </CardContent>
+                </Card>
+            )
+        }
+        if (ds.status === 'Rejeté') {
+            return (
+                <Card className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400"><XCircle/> Information de Rejet</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                         <p><strong>Rejeté par :</strong> {ds.validePar}</p>
+                         <p><strong>Date :</strong> {ds.dateValidation ? format(ds.dateValidation.toDate(), 'PPP p', { locale: fr }) : 'N/A'}</p>
+                         <p><strong>Motif :</strong> {ds.rejetMotif || "Aucun motif fourni."}</p>
+                    </CardContent>
+                </Card>
+            )
+        }
+        if (ds.status === 'À corriger') {
+             return (
+                <Card className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400"><MessageSquareWarning/> Demande de Correction</CardTitle>
+                    </CardHeader>
+                    <CardContent className="text-sm space-y-2">
+                        <p><strong>Demandé par :</strong> {ds.validePar}</p>
+                        <p><strong>Date :</strong> {ds.dateValidation ? format(ds.dateValidation.toDate(), 'PPP p', { locale: fr }) : 'N/A'}</p>
+                        <p><strong>Commentaire :</strong> {ds.demandeCorrectionCommentaire || "Aucun commentaire."}</p>
+                    </CardContent>
+                </Card>
+            )
+        }
+        return null;
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between gap-4">
@@ -166,7 +225,7 @@ export default function DialogueSecuriteDetailPage() {
                         <p className="text-muted-foreground">ID: {ds.id}</p>
                     </div>
                 </div>
-                {canManage && (
+                {canManage && ds.status !== 'En attente de validation' && (
                  <div className="flex items-center gap-2">
                     <Button asChild>
                         <Link href={`/dashboard/audits/${ds.id}/edit`}>
@@ -198,6 +257,8 @@ export default function DialogueSecuriteDetailPage() {
                 </div>
                 )}
             </div>
+            
+            <ValidationInfoCard />
 
             <Card>
                 <CardHeader>
@@ -298,7 +359,7 @@ export default function DialogueSecuriteDetailPage() {
                                 </div>
                                 <div className="space-y-1">
                                     <p className="font-medium">Statut</p>
-                                    <Badge variant={getStatusVariant(anomalie.statut)}>{anomalie.statut}</Badge>
+                                    <Badge variant={anomalie.statut === 'Réalisée' ? 'default' : 'outline'}>{anomalie.statut}</Badge>
                                 </div>
                             </div>
                         </div>
