@@ -59,7 +59,7 @@ export default function NewChasseAuxAnomaliesPage() {
   const form = useForm<ChasseAuxAnomaliesFormValues>({
     resolver: zodResolver(chasseAuxAnomaliesSchema),
     defaultValues: {
-      animateur: user?.email || '',
+      animateur: user?.displayName || user?.email || '',
       date: new Date(),
       anomalies: [{ 
         description: '', 

@@ -18,6 +18,10 @@ import { useRouter } from 'next/navigation';
 
 export type AppUser = User & {
   role: string;
+  firstName: string;
+  lastName: string;
+  position: string;
+  entity: string;
 };
 
 interface AuthContextType {
@@ -25,7 +29,7 @@ interface AuthContextType {
   loading: boolean;
   signIn: typeof signInWithEmailAndPassword;
   signOut: () => Promise<void>;
-  updateUserProfile?: (data: { displayName: string }) => Promise<void>;
+  updateUserProfile?: (data: { displayName: string; firstName: string; lastName: string }) => Promise<void>;
   updateUserPassword?: (oldPass: string, newPass: string) => Promise<void>;
 }
 
@@ -41,15 +45,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (authUser) {
         const userDocRef = doc(db, 'users', authUser.uid);
         const userDocSnap = await getDoc(userDocRef);
-        let role = 'niveau1'; // Default role
+        
+        let appUserData: Omit<AppUser, keyof User> = {
+            role: 'niveau1',
+            firstName: '',
+            lastName: '',
+            position: '',
+            entity: '',
+            displayName: authUser.displayName || authUser.email || '',
+        };
+
         if (userDocSnap.exists()) {
-          role = userDocSnap.data().role || 'niveau1';
+            const data = userDocSnap.data();
+            appUserData = {
+                role: data.role || 'niveau1',
+                firstName: data.firstName || '',
+                lastName: data.lastName || '',
+                displayName: data.displayName || appUserData.displayName,
+                position: data.position || '',
+                entity: data.entity || '',
+            }
         } else {
           // If user doc doesn't exist, create it for them with default role
           try {
               await setDoc(userDocRef, {
                   email: authUser.email,
                   displayName: authUser.displayName || authUser.email,
+                  firstName: '',
+                  lastName: '',
+                  position: '',
+                  entity: '',
                   role: 'niveau1',
                   createdAt: serverTimestamp(),
               });
@@ -57,7 +82,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               console.error("Error creating user document", e);
           }
         }
-        setUser({ ...authUser, role });
+        setUser({ ...authUser, ...appUserData });
       } else {
         setUser(null);
       }
@@ -67,14 +92,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  const updateUserProfile = async (data: { displayName: string }) => {
+  const updateUserProfile = async (data: { displayName: string; firstName: string; lastName: string }) => {
     if (auth.currentUser) {
-      await updateProfile(auth.currentUser, data);
+      await updateProfile(auth.currentUser, { displayName: data.displayName });
       // Update the user document in Firestore as well
       const userDocRef = doc(db, 'users', auth.currentUser.uid);
-      await setDoc(userDocRef, { displayName: data.displayName }, { merge: true });
+      await setDoc(userDocRef, { 
+          displayName: data.displayName,
+          firstName: data.firstName,
+          lastName: data.lastName,
+       }, { merge: true });
       // Create a new object from auth.currentUser to force a state update.
-      setUser(prevUser => prevUser ? { ...prevUser, ...auth.currentUser, displayName: data.displayName } as AppUser : null);
+      setUser(prevUser => {
+        if (!prevUser) return null;
+        return {
+            ...prevUser,
+            displayName: data.displayName,
+            firstName: data.firstName,
+            lastName: data.lastName,
+        };
+      });
     } else {
       throw new Error("User not authenticated");
     }

@@ -9,7 +9,7 @@ import * as z from "zod"
 import { useForm } from "react-hook-form"
 import { db, auth } from "@/lib/firebase"
 import { collection, getDocs, doc, updateDoc, setDoc, serverTimestamp } from "firebase/firestore"
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
@@ -61,10 +61,20 @@ type PasswordFormValues = z.infer<typeof passwordSchema>;
 const userCreationSchema = z.object({
     email: z.string().email({ message: "L'adresse email est invalide." }),
     password: z.string().min(6, "Le mot de passe doit contenir au moins 6 caractères."),
+    firstName: z.string().min(1, "Le prénom est requis."),
+    lastName: z.string().min(1, "Le nom est requis."),
+    position: z.string().min(1, "Le poste est requis."),
+    entity: z.string().min(1, "L'entité est requise."),
     role: z.enum(['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin']),
 });
 
 type UserCreationFormValues = z.infer<typeof userCreationSchema>;
+
+const profileSchema = z.object({
+  firstName: z.string().min(1, "Le prénom est requis."),
+  lastName: z.string().min(1, "Le nom de famille est requis."),
+});
+type ProfileFormValues = z.infer<typeof profileSchema>;
 
 
 interface AppUserDoc {
@@ -72,6 +82,10 @@ interface AppUserDoc {
   email: string;
   displayName: string;
   role: string;
+  firstName: string;
+  lastName: string;
+  position: string;
+  entity: string;
 }
 
 const UserManagementCard = () => {
@@ -85,6 +99,10 @@ const UserManagementCard = () => {
     defaultValues: {
         email: "",
         password: "",
+        firstName: "",
+        lastName: "",
+        position: "",
+        entity: "",
         role: "niveau1",
     }
   });
@@ -150,15 +168,31 @@ const UserManagementCard = () => {
     try {
         const userCredential = await createUserWithEmailAndPassword(tempAuth, values.email, values.password);
         const newUser = userCredential.user;
+        const displayName = `${values.firstName} ${values.lastName}`;
+        
+        await updateProfile(newUser, { displayName });
 
         await setDoc(doc(db, "users", newUser.uid), {
             email: newUser.email,
-            displayName: newUser.email,
+            displayName: displayName,
+            firstName: values.firstName,
+            lastName: values.lastName,
+            position: values.position,
+            entity: values.entity,
             role: values.role,
             createdAt: serverTimestamp(),
         });
         
-        setUsers(prev => [...prev, { id: newUser.uid, email: newUser.email!, displayName: newUser.email!, role: values.role }]);
+        setUsers(prev => [...prev, { 
+            id: newUser.uid, 
+            email: newUser.email!, 
+            displayName: displayName, 
+            role: values.role,
+            firstName: values.firstName,
+            lastName: values.lastName,
+            position: values.position,
+            entity: values.entity
+        }]);
 
         toast({
             title: "Utilisateur créé avec succès",
@@ -199,7 +233,7 @@ const UserManagementCard = () => {
             <DialogTrigger asChild>
                 <Button><UserPlus className="mr-2 h-4 w-4" /> Ajouter un utilisateur</Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Créer un nouvel utilisateur</DialogTitle>
                     <DialogDescription>
@@ -208,57 +242,38 @@ const UserManagementCard = () => {
                 </DialogHeader>
                  <Form {...userCreationForm}>
                     <form onSubmit={userCreationForm.handleSubmit(handleCreateUser)} className="space-y-4">
-                        <FormField
-                            control={userCreationForm.control}
-                            name="email"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Email</FormLabel>
-                                    <FormControl>
-                                        <Input type="email" placeholder="utilisateur@exemple.com" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                         <FormField
-                            control={userCreationForm.control}
-                            name="password"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Mot de passe temporaire</FormLabel>
-                                    <FormControl>
-                                        <Input type="password" {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={userCreationForm.control}
-                            name="role"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Rôle</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Choisir un rôle" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="admin">Admin</SelectItem>
-                                        <SelectItem value="niveau5">Direction</SelectItem>
-                                        <SelectItem value="niveau4">Responsable</SelectItem>
-                                        <SelectItem value="niveau3">Superviseur</SelectItem>
-                                        <SelectItem value="niveau2">Animateur</SelectItem>
-                                        <SelectItem value="niveau1">Collaborateur</SelectItem>
-                                    </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField control={userCreationForm.control} name="lastName" render={({ field }) => (
+                                <FormItem><FormLabel>Nom</FormLabel><FormControl><Input placeholder="Dupont" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                             <FormField control={userCreationForm.control} name="firstName" render={({ field }) => (
+                                <FormItem><FormLabel>Prénom</FormLabel><FormControl><Input placeholder="Jean" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                        </div>
+                        <FormField control={userCreationForm.control} name="email" render={({ field }) => (
+                            <FormItem><FormLabel>Email</FormLabel><FormControl><Input type="email" placeholder="utilisateur@exemple.com" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <FormField control={userCreationForm.control} name="password" render={({ field }) => (
+                            <FormItem><FormLabel>Mot de passe temporaire</FormLabel><FormControl><Input type="password" {...field} /></FormControl><FormMessage /></FormItem>
+                        )}/>
+                        <div className="grid grid-cols-2 gap-4">
+                            <FormField control={userCreationForm.control} name="position" render={({ field }) => (
+                                <FormItem><FormLabel>Poste</FormLabel><FormControl><Input placeholder="Opérateur" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                            <FormField control={userCreationForm.control} name="entity" render={({ field }) => (
+                                <FormItem><FormLabel>Entité</FormLabel><FormControl><Input placeholder="Production" {...field} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                        </div>
+                        <FormField control={userCreationForm.control} name="role" render={({ field }) => (
+                            <FormItem><FormLabel>Rôle</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Choisir un rôle" /></SelectTrigger></FormControl><SelectContent>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="niveau5">Direction</SelectItem>
+                                <SelectItem value="niveau4">Responsable</SelectItem>
+                                <SelectItem value="niveau3">Superviseur</SelectItem>
+                                <SelectItem value="niveau2">Animateur</SelectItem>
+                                <SelectItem value="niveau1">Collaborateur</SelectItem>
+                            </SelectContent></Select><FormMessage /></FormItem>
+                        )}/>
                         <DialogFooter>
                             <Button type="submit" disabled={userCreationForm.formState.isSubmitting}>
                                 {userCreationForm.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -274,7 +289,9 @@ const UserManagementCard = () => {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Nom & Prénom</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Poste</TableHead>
               <TableHead>Rôle</TableHead>
             </TableRow>
           </TableHeader>
@@ -282,14 +299,18 @@ const UserManagementCard = () => {
             {loadingUsers ? (
               [...Array(3)].map((_, i) => (
                 <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-10 w-32" /></TableCell>
                 </TableRow>
               ))
             ) : (
               users.map(u => (
                 <TableRow key={u.id}>
+                  <TableCell>{u.displayName}</TableCell>
                   <TableCell>{u.email}</TableCell>
+                  <TableCell>{u.position}</TableCell>
                   <TableCell>
                     <Select value={u.role} onValueChange={(value) => handleRoleChange(u.id, value)}>
                       <SelectTrigger className="w-[180px]">
@@ -334,7 +355,6 @@ export default function SettingsPage() {
   const { toast } = useToast()
   const isAdmin = user?.role === 'admin';
 
-  const [displayName, setDisplayName] = useState("")
   const [email, setEmail] = useState("")
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false)
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false)
@@ -348,28 +368,30 @@ export default function SettingsPage() {
     }
   });
 
+  const profileForm = useForm<ProfileFormValues>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+    },
+  });
+
   useEffect(() => {
     if (user) {
-        setDisplayName(user.displayName || "")
+        profileForm.reset({
+            firstName: user.firstName || "",
+            lastName: user.lastName || "",
+        });
         setEmail(user.email || "")
     }
-  }, [user])
+  }, [user, profileForm])
 
-  const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!displayName.trim()) {
-        toast({
-            variant: "destructive",
-            title: "Nom Invalide",
-            description: "Le nom ne peut pas être vide.",
-        })
-        return;
-    }
-    
+  const handleProfileUpdate = async (values: ProfileFormValues) => {
     setIsUpdatingProfile(true)
     try {
         if (updateUserProfile) {
-          await updateUserProfile({ displayName })
+          const displayName = `${values.firstName} ${values.lastName}`;
+          await updateUserProfile({ displayName, ...values })
           toast({
               title: "Profil Mis à Jour",
               description: "Votre nom a été mis à jour avec succès.",
@@ -526,23 +548,29 @@ export default function SettingsPage() {
                     <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> Mon Profil</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleProfileUpdate} className="space-y-4">
-                      <div>
-                          <Label htmlFor="name">Nom</Label>
-                          <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} disabled={!isAdmin} />
-                           {!isAdmin && (
-                            <p className="text-xs text-muted-foreground pt-1">Seul un administrateur peut modifier le nom.</p>
-                          )}
-                      </div>
+                  <Form {...profileForm}>
+                    <form onSubmit={profileForm.handleSubmit(handleProfileUpdate)} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                           <FormField control={profileForm.control} name="lastName" render={({ field }) => (
+                                <FormItem><FormLabel>Nom</FormLabel><FormControl><Input {...field} disabled={!isAdmin} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                             <FormField control={profileForm.control} name="firstName" render={({ field }) => (
+                                <FormItem><FormLabel>Prénom</FormLabel><FormControl><Input {...field} disabled={!isAdmin} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                        </div>
                        <div>
                           <Label htmlFor="email-settings">Email</Label>
                           <Input id="email-settings" type="email" value={email} readOnly disabled />
                       </div>
+                      {!isAdmin && (
+                        <p className="text-xs text-muted-foreground pt-1">Seul un administrateur peut modifier le nom.</p>
+                      )}
                       <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isUpdatingProfile || !isAdmin}>
                           {isUpdatingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Mettre à jour le profil
                       </Button>
                   </form>
+                  </Form>
                 </CardContent>
              </Card>
         </div>
@@ -550,5 +578,3 @@ export default function SettingsPage() {
     </div>
   )
 }
-
-    

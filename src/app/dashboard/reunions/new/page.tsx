@@ -48,7 +48,7 @@ export default function NewReunionPage() {
   const form = useForm<ReunionFormValues>({
     resolver: zodResolver(reunionSchema),
     defaultValues: {
-      animateur: user?.email || '',
+      animateur: user?.displayName || user?.email || '',
       nature: "presentielle",
       date: new Date(),
       source: '',

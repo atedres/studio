@@ -59,7 +59,7 @@ export default function NewDialogueSecuritePage() {
   const form = useForm<DialogueSecuriteFormValues>({
     resolver: zodResolver(dialogueSecuriteSchema),
     defaultValues: {
-      observateur: user?.email || '',
+      observateur: user?.displayName || user?.email || '',
       date: new Date(),
       comportementsPositifs: [{ value: "" }],
       anomalies: [],

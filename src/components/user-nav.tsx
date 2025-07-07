@@ -26,8 +26,9 @@ export function UserNav() {
     return null
   }
 
-  const getInitials = (name: string | null, email: string | null) => {
-    if (name) return name.slice(0, 2).toUpperCase();
+  const getInitials = (firstName?: string, lastName?: string, email?: string | null) => {
+    if (firstName && lastName) return `${firstName[0]}${lastName[0]}`.toUpperCase();
+    if (user.displayName) return user.displayName.slice(0, 2).toUpperCase();
     if (email) return email.slice(0, 2).toUpperCase();
     return "AD";
   }
@@ -38,7 +39,7 @@ export function UserNav() {
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-9 w-9">
             <AvatarImage src="https://placehold.co/100x100.png" alt="@shadcn" data-ai-hint="user avatar" />
-            <AvatarFallback>{getInitials(user.displayName, user.email)}</AvatarFallback>
+            <AvatarFallback>{getInitials(user.firstName, user.lastName, user.email)}</AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
