@@ -46,7 +46,7 @@ const famillesDeRisqueData = ["Chute de plain-pied", "Risque chimique", "Risque 
 // Function to seed initial data if collections are empty
 const seedInitialData = async () => {
     // This flag in localStorage prevents re-seeding on every login
-    if (localStorage.getItem('db_seeded_v1')) {
+    if (localStorage.getItem('db_seeded_v2')) {
         return;
     }
 
@@ -73,7 +73,7 @@ const seedInitialData = async () => {
             checkAndSeed('famillesDeRisque', famillesDeRisqueData),
         ]);
         
-        localStorage.setItem('db_seeded_v1', 'true');
+        localStorage.setItem('db_seeded_v2', 'true');
     } catch (error) {
         console.error("Error during database seeding:", error);
     }
