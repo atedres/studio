@@ -529,13 +529,16 @@ export default function SettingsPage() {
                   <form onSubmit={handleProfileUpdate} className="space-y-4">
                       <div>
                           <Label htmlFor="name">Nom</Label>
-                          <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+                          <Input id="name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} disabled={!isAdmin} />
+                           {!isAdmin && (
+                            <p className="text-xs text-muted-foreground pt-1">Seul un administrateur peut modifier le nom.</p>
+                          )}
                       </div>
                        <div>
                           <Label htmlFor="email-settings">Email</Label>
                           <Input id="email-settings" type="email" value={email} readOnly disabled />
                       </div>
-                      <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isUpdatingProfile}>
+                      <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isUpdatingProfile || !isAdmin}>
                           {isUpdatingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                           Mettre à jour le profil
                       </Button>
