@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -15,11 +15,11 @@ import { Input } from "@/components/ui/input"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2 } from "lucide-react"
+import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, Check, MessageCircle } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore"
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
@@ -54,6 +54,7 @@ export default function NewDialogueSecuritePage() {
   const { user } = useAuth()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = React.useState(false)
+  const [submissionSuccess, setSubmissionSuccess] = React.useState(false);
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false)
   const [openEcheancePopovers, setOpenEcheancePopovers] = React.useState<Record<number, boolean>>({})
 
@@ -151,7 +152,7 @@ export default function NewDialogueSecuritePage() {
         title: "Formulaire Soumis",
         description: "Le dialogue de sécurité a été envoyé pour validation.",
       })
-      router.push('/dashboard/audits')
+      setSubmissionSuccess(true);
     } catch (error) {
       console.error("Error adding document: ", error)
       toast({
@@ -198,6 +199,45 @@ export default function NewDialogueSecuritePage() {
     } finally {
         setIsSubmitting(false);
     }
+  }
+  
+  const whatsAppMessage = useMemo(() => {
+    const message = `Bonjour, je vous informe que j'ai rédigé un nouveau Dialogue de Sécurité qui est en attente de votre validation. Cordialement, ${user?.displayName || 'un collaborateur'}.`;
+    return encodeURIComponent(message);
+  }, [user]);
+
+  if (submissionSuccess) {
+    return (
+        <div className="flex items-center justify-center py-20">
+            <Card className="w-full max-w-lg text-center">
+                <CardHeader>
+                    <div className="mx-auto bg-green-100 rounded-full p-3 w-fit mb-4 dark:bg-green-900">
+                        <Check className="h-8 w-8 text-green-600 dark:text-green-400" />
+                    </div>
+                    <CardTitle>Soumission Réussie !</CardTitle>
+                    <CardDescription>
+                        Votre dialogue de sécurité a été envoyé pour validation.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                     <p className="text-sm text-muted-foreground">
+                        Vous pouvez maintenant notifier votre superviseur directement sur WhatsApp pour une validation plus rapide.
+                    </p>
+                    <Button asChild className="w-full bg-green-600 hover:bg-green-700 text-white gap-2">
+                        <a href={`https://wa.me/?text=${whatsAppMessage}`} target="_blank" rel="noopener noreferrer">
+                           <MessageCircle className="h-5 w-5" />
+                            Notifier par WhatsApp
+                        </a>
+                    </Button>
+                </CardContent>
+                <CardFooter>
+                    <Button variant="outline" asChild className="w-full">
+                        <Link href="/dashboard/audits">Retour à la liste des dialogues</Link>
+                    </Button>
+                </CardFooter>
+            </Card>
+        </div>
+    );
   }
 
   return (
