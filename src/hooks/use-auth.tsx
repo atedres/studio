@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import {
-  User,
+  User as FirebaseUser,
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
@@ -16,7 +16,10 @@ import { auth, db } from '@/lib/firebase';
 import { doc, getDoc, setDoc, serverTimestamp, collection, getDocs, query, limit, writeBatch, updateDoc } from "firebase/firestore";
 import { useRouter } from 'next/navigation';
 
-export type AppUser = User & {
+export type AppUser = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
   role: string;
   firstName: string;
   lastName: string;
@@ -95,24 +98,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const userDocRef = doc(db, 'users', authUser.uid);
         const userDocSnap = await getDoc(userDocRef);
         
-        let appUserData: Omit<AppUser, keyof User> = {
+        let dbData = {
             role: 'niveau1',
             firstName: '',
             lastName: '',
             position: '',
             entity: '',
-            displayName: authUser.displayName || authUser.email || '',
+            displayName: authUser.displayName,
         };
 
         if (userDocSnap.exists()) {
             const data = userDocSnap.data();
-            appUserData = {
+            dbData = {
                 role: data.role || 'niveau1',
                 firstName: data.firstName || '',
                 lastName: data.lastName || '',
-                displayName: data.displayName || appUserData.displayName,
                 position: data.position || '',
                 entity: data.entity || '',
+                displayName: data.displayName || authUser.displayName,
             }
         } else {
           // If user doc doesn't exist, create it for them with default role
@@ -131,7 +134,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               console.error("Error creating user document", e);
           }
         }
-        setUser({ ...authUser, ...appUserData });
+        
+        const appUser: AppUser = {
+            uid: authUser.uid,
+            email: authUser.email,
+            displayName: dbData.displayName,
+            role: dbData.role,
+            firstName: dbData.firstName,
+            lastName: dbData.lastName,
+            position: dbData.position,
+            entity: dbData.entity,
+        };
+
+        setUser(appUser);
+
       } else {
         setUser(null);
       }
@@ -211,5 +227,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-    
