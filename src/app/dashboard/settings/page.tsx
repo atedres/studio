@@ -2,6 +2,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
+import Link from "next/link"
 import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -21,6 +22,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter
 } from "@/components/ui/card"
 import {
   Dialog,
@@ -42,7 +44,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
-import { User, Bell, Lock, Users, Loader2, UserPlus, Edit } from "lucide-react"
+import { User, Bell, Lock, Users, Loader2, UserPlus, Edit, Database } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -635,9 +637,34 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-6">
             {isAdmin ? <UserManagementCard /> : <AccessRightsPlaceholder />}
+            
+            {isAdmin && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Database className="h-5 w-5" /> Gestion des Données
+                        </CardTitle>
+                        <CardDescription>
+                          Ajoutez ou modifiez les entrées pour les listes déroulantes utilisées dans l'application (zones, postes, etc.).
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground">
+                          Centralisez la gestion de vos données de référence pour assurer la cohérence des formulaires.
+                        </p>
+                    </CardContent>
+                    <CardFooter>
+                        <Button asChild>
+                            <Link href="/dashboard/settings/data-management">
+                                Accéder à la gestion des données
+                            </Link>
+                        </Button>
+                    </CardFooter>
+                </Card>
+            )}
 
             <Card>
                 <CardHeader>
@@ -661,7 +688,38 @@ export default function SettingsPage() {
             </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="lg:col-span-1 space-y-6">
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> Mon Profil</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Form {...profileForm}>
+                    <form onSubmit={profileForm.handleSubmit(handleProfileUpdate)} className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                           <FormField control={profileForm.control} name="lastName" render={({ field }) => (
+                                <FormItem><FormLabel>Nom</FormLabel><FormControl><Input {...field} disabled={!isAdmin} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                             <FormField control={profileForm.control} name="firstName" render={({ field }) => (
+                                <FormItem><FormLabel>Prénom</FormLabel><FormControl><Input {...field} disabled={!isAdmin} /></FormControl><FormMessage /></FormItem>
+                            )}/>
+                        </div>
+                       <div>
+                          <Label htmlFor="email-settings">Email</Label>
+                          <Input id="email-settings" type="email" value={email} readOnly disabled />
+                      </div>
+                      {!isAdmin && (
+                        <p className="text-xs text-muted-foreground pt-1">Seul un administrateur peut modifier le nom.</p>
+                      )}
+                      <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isUpdatingProfile || !isAdmin}>
+                          {isUpdatingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Mettre à jour le profil
+                      </Button>
+                  </form>
+                  </Form>
+                </CardContent>
+             </Card>
+
              <Card>
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2"><Lock className="h-5 w-5" /> Sécurité</CardTitle>
@@ -731,37 +789,6 @@ export default function SettingsPage() {
                     </Dialog>
                     <Button variant="outline" className="w-full">Activer l'authentification à deux facteurs</Button>
                     <p className="text-xs text-muted-foreground text-center pt-2">Dernière modification de mot de passe: il y a 3 mois.</p>
-                </CardContent>
-             </Card>
-
-             <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><User className="h-5 w-5" /> Mon Profil</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Form {...profileForm}>
-                    <form onSubmit={profileForm.handleSubmit(handleProfileUpdate)} className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                           <FormField control={profileForm.control} name="lastName" render={({ field }) => (
-                                <FormItem><FormLabel>Nom</FormLabel><FormControl><Input {...field} disabled={!isAdmin} /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                             <FormField control={profileForm.control} name="firstName" render={({ field }) => (
-                                <FormItem><FormLabel>Prénom</FormLabel><FormControl><Input {...field} disabled={!isAdmin} /></FormControl><FormMessage /></FormItem>
-                            )}/>
-                        </div>
-                       <div>
-                          <Label htmlFor="email-settings">Email</Label>
-                          <Input id="email-settings" type="email" value={email} readOnly disabled />
-                      </div>
-                      {!isAdmin && (
-                        <p className="text-xs text-muted-foreground pt-1">Seul un administrateur peut modifier le nom.</p>
-                      )}
-                      <Button type="submit" className="w-full bg-accent hover:bg-accent/90" disabled={isUpdatingProfile || !isAdmin}>
-                          {isUpdatingProfile && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                          Mettre à jour le profil
-                      </Button>
-                  </form>
-                  </Form>
                 </CardContent>
              </Card>
         </div>
