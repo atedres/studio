@@ -6,7 +6,7 @@ import { db } from "@/lib/firebase"
 import { collection, getDocs, addDoc, updateDoc, doc, query, orderBy, deleteDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
@@ -15,6 +15,7 @@ import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Loader2, PlusCircle, Edit, Trash2 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 
 interface DataItem {
     id: string;
