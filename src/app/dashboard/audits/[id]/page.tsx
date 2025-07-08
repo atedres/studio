@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth';
 import { Separator } from '@/components/ui/separator';
+import { logActivity } from '@/lib/activityLogger';
 
 interface Anomaly {
     type: "AD" | "IS" | "SD";
@@ -95,6 +96,7 @@ export default function DialogueSecuriteDetailPage() {
         try {
             const docRef = doc(db, 'dialoguesSecurite', id);
             await deleteDoc(docRef);
+            await logActivity(user, "Suppression d'un Dialogue Sécurité", { docId: id });
             toast({
                 title: "Suppression réussie",
                 description: "Le Dialogue Sécurité a été supprimé.",

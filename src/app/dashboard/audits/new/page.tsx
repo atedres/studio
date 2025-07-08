@@ -23,6 +23,7 @@ import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, Check
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore"
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
+import { logActivity } from '@/lib/activityLogger'
 
 const dialogueSecuriteSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -141,13 +142,14 @@ export default function NewDialogueSecuritePage() {
     }
     setIsSubmitting(true)
     try {
-      await addDoc(collection(db, "dialoguesSecurite"), {
+      const newDocRef = await addDoc(collection(db, "dialoguesSecurite"), {
         ...data,
         createdBy: user.uid,
         userEmail: user.email,
         createdAt: serverTimestamp(),
         status: "En attente de validation",
       });
+      await logActivity(user, "Soumission d'un Dialogue Sécurité", { docId: newDocRef.id });
       toast({
         title: "Formulaire Soumis",
         description: "Le dialogue de sécurité a été envoyé pour validation.",
@@ -177,13 +179,14 @@ export default function NewDialogueSecuritePage() {
     setIsSubmitting(true);
     const data = form.getValues();
     try {
-      await addDoc(collection(db, "dialoguesSecurite"), {
+      const newDocRef = await addDoc(collection(db, "dialoguesSecurite"), {
         ...data,
         status: "Brouillon",
         createdBy: user.uid,
         userEmail: user.email,
         createdAt: serverTimestamp(),
       });
+      await logActivity(user, "Enregistrement d'un brouillon de DS", { docId: newDocRef.id });
       toast({
         title: "Brouillon Enregistré",
         description: "Le dialogue de sécurité a été sauvegardé en tant que brouillon.",

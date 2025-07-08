@@ -18,11 +18,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
 import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2 } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { doc, getDoc, updateDoc, Timestamp, collection, getDocs, query, where } from "firebase/firestore"
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
+import { logActivity } from '@/lib/activityLogger'
 
 const dialogueSecuriteSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -54,6 +56,7 @@ export default function EditDialogueSecuritePage() {
     const router = useRouter()
     const params = useParams()
     const id = params.id as string
+    const { user } = useAuth();
 
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [loading, setLoading] = useState(true)
@@ -163,6 +166,7 @@ export default function EditDialogueSecuritePage() {
         try {
             const docRef = doc(db, "dialoguesSecurite", id);
             await updateDoc(docRef, { ...data });
+            await logActivity(user, "Modification d'un Dialogue Sécurité", { docId: id });
             toast({
                 title: "Mise à Jour Réussie",
                 description: "Le Dialogue Sécurité a été mis à jour.",

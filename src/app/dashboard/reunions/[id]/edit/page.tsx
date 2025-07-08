@@ -19,11 +19,13 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
 import { Calendar as CalendarIcon, ArrowLeft, Loader2 } from "lucide-react"
 import { db, storage } from "@/lib/firebase"
 import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { logActivity } from '@/lib/activityLogger'
 
 const reunionSchema = z.object({
   nature: z.enum(["presentielle", "distancielle"], { required_error: "La nature de la réunion est requise." }),
@@ -47,6 +49,7 @@ export default function EditReunionPage() {
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
+  const { user } = useAuth();
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -126,6 +129,7 @@ export default function EditReunionPage() {
     try {
       const docRef = doc(db, "reunions", id);
       await updateDoc(docRef, dataToUpdate);
+      await logActivity(user, "Modification d'une réunion", { docId: id, objet: data.objet });
       toast({
         title: "Mise à Jour Réussie",
         description: "La réunion a été mise à jour.",

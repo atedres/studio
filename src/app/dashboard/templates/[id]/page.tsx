@@ -20,6 +20,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { logActivity } from '@/lib/activityLogger';
 
 type FormField = FormGeneratorOutput['fields'][0];
 
@@ -173,7 +174,7 @@ export default function FillTemplatePage() {
             // Wait for all file uploads to complete
             await Promise.all(fileUploadPromises);
 
-            await addDoc(collection(db, 'formSubmissions'), {
+            const newDocRef = await addDoc(collection(db, 'formSubmissions'), {
                 templateId: id,
                 templateTitle: template.title,
                 submittedBy: user.uid,
@@ -181,6 +182,8 @@ export default function FillTemplatePage() {
                 submittedAt: serverTimestamp(),
                 formData: dataToSubmit,
             });
+
+            await logActivity(user, "Soumission d'un formulaire personnalisé", { docId: newDocRef.id, template: template.title });
 
             toast({
                 title: "Formulaire Soumis",

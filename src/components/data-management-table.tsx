@@ -5,6 +5,8 @@ import React, { useState, useEffect, useCallback } from "react"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, addDoc, updateDoc, doc, query, orderBy, deleteDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
+import { useAuth } from "@/hooks/use-auth"
+import { logActivity } from "@/lib/activityLogger"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
@@ -38,6 +40,7 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
     const [editedItemName, setEditedItemName] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const { toast } = useToast();
+    const { user } = useAuth();
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -62,6 +65,7 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
         const itemRef = doc(db, collectionName, item.id);
         try {
             await updateDoc(itemRef, { actif: !item.actif });
+            await logActivity(user, `Changement statut de "${title}"`, { name: item.nom, newStatus: !item.actif });
             setItems(prevItems => prevItems.map(i => i.id === item.id ? { ...i, actif: !i.actif } : i));
             toast({ title: "Statut mis à jour", description: `"${item.nom}" est maintenant ${item.actif ? "inactif" : "actif"}.` });
         } catch (error) {
@@ -82,6 +86,7 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
                 nom: newItemName,
                 actif: true,
             });
+            await logActivity(user, `Ajout à "${title}"`, { name: newItemName });
             toast({ title: "Succès", description: `"${newItemName}" a été ajouté à ${title}.` });
             setNewItemName("");
             setIsAddDialogOpen(false);
@@ -110,6 +115,7 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
         const itemRef = doc(db, collectionName, editingItem.id);
         try {
             await updateDoc(itemRef, { nom: editedItemName });
+            await logActivity(user, `Modification de "${title}"`, { oldName: editingItem.nom, newName: editedItemName });
             toast({ title: "Succès", description: `L'élément a été renommé en "${editedItemName}".` });
             setEditingItem(null);
             setEditedItemName("");
@@ -124,10 +130,14 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
     }
 
     const handleDeleteItem = async (itemId: string) => {
+        const itemToDelete = items.find(i => i.id === itemId);
+        if (!itemToDelete) return;
+
         setIsSubmitting(true);
         const itemRef = doc(db, collectionName, itemId);
         try {
             await deleteDoc(itemRef);
+            await logActivity(user, `Suppression de "${title}"`, { name: itemToDelete.nom });
             toast({ title: "Succès", description: "L'élément a été supprimé." });
             fetchData(); // Refresh data
         } catch (error) {

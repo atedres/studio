@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
+import { logActivity } from "@/lib/activityLogger"
 
 interface FormTemplate {
     id: string;
@@ -69,10 +70,14 @@ export default function FormTemplatesPage() {
     }, []);
 
     const handleDelete = async (templateId: string) => {
+        const templateToDelete = templates.find(t => t.id === templateId);
+        if (!templateToDelete) return;
+
         setIsDeleting(templateId)
         try {
             await deleteDoc(doc(db, "formTemplates", templateId));
             setTemplates(prev => prev.filter(template => template.id !== templateId));
+            await logActivity(user, "Suppression d'un modèle de formulaire", { docId: templateId, title: templateToDelete.title });
             toast({
                 title: "Modèle Supprimé",
                 description: "Le modèle de formulaire a été supprimé avec succès.",

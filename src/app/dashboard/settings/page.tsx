@@ -13,6 +13,7 @@ import { collection, getDocs, doc, updateDoc, setDoc, serverTimestamp, query, wh
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { initializeApp, deleteApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { logActivity } from '@/lib/activityLogger';
 
 
 import { Button } from "@/components/ui/button"
@@ -106,7 +107,7 @@ const UserManagementCard = () => {
   const [isEditUserOpen, setIsEditUserOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<AppUserDoc | null>(null);
   const { toast } = useToast();
-  const { updateUserDocument } = useAuth();
+  const { user: adminUser, updateUserDocument } = useAuth();
 
   const [postes, setPostes] = useState<string[]>([]);
   const [entites, setEntites] = useState<string[]>([]);
@@ -192,10 +193,14 @@ const UserManagementCard = () => {
 
 
   const handleRoleChange = async (userId: string, newRole: string) => {
+    const userToUpdate = users.find(u => u.id === userId);
+    if (!userToUpdate) return;
+    
     const userDocRef = doc(db, "users", userId);
     try {
       await updateDoc(userDocRef, { role: newRole });
       setUsers(prevUsers => prevUsers.map(u => u.id === userId ? { ...u, role: newRole } : u));
+      await logActivity(adminUser, "Modification du rôle de l'utilisateur", { targetUserEmail: userToUpdate.email, newRole });
       toast({
         title: "Rôle mis à jour",
         description: `Le rôle a été changé en ${newRole}.`,
@@ -231,6 +236,7 @@ const UserManagementCard = () => {
           u.id === editingUser.id ? { ...u, ...values, displayName: `${values.firstName} ${values.lastName}` } : u
         )
       );
+      await logActivity(adminUser, "Modification des informations de l'utilisateur", { targetUserEmail: editingUser.email });
       toast({
         title: "Utilisateur mis à jour",
         description: `Les informations pour ${editingUser.email} ont été mises à jour.`,
@@ -281,6 +287,8 @@ const UserManagementCard = () => {
             role: values.role,
             createdAt: serverTimestamp(),
         });
+
+        await logActivity(adminUser, "Création d'un utilisateur", { newUserEmail: values.email, role: values.role });
         
         setUsers(prev => [...prev, { 
             id: newUser.uid, 
@@ -585,6 +593,7 @@ export default function SettingsPage() {
         if (updateUserProfile) {
           const displayName = `${values.firstName} ${values.lastName}`;
           await updateUserProfile({ displayName, ...values })
+          await logActivity(user, "Mise à jour de son profil");
           toast({
               title: "Profil Mis à Jour",
               description: "Votre nom a été mis à jour avec succès.",
@@ -607,6 +616,7 @@ export default function SettingsPage() {
 
     try {
         await updateUserPassword(values.currentPassword, values.newPassword);
+        await logActivity(user, "Modification de son mot de passe");
         toast({
             title: "Succès",
             description: "Votre mot de passe a été changé avec succès.",

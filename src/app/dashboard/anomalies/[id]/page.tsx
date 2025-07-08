@@ -27,6 +27,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth';
 import { Separator } from '@/components/ui/separator';
+import { logActivity } from '@/lib/activityLogger';
 
 
 interface Anomaly {
@@ -93,6 +94,7 @@ export default function ChasseAuxAnomaliesDetailPage() {
         try {
             const docRef = doc(db, 'chassesAuxAnomalies', id);
             await deleteDoc(docRef);
+            await logActivity(user, "Suppression d'une Chasse aux Anomalies", { docId: id });
             toast({
                 title: "Suppression réussie",
                 description: "Le rapport de CAA a été supprimé.",

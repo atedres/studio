@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth';
+import { logActivity } from '@/lib/activityLogger';
 
 interface ReunionDetails {
   id: string;
@@ -77,10 +78,12 @@ export default function ReunionDetailPage() {
     }, [id]);
 
     const handleDelete = async () => {
+        if (!reunion) return;
         setIsDeleting(true);
         try {
             const docRef = doc(db, 'reunions', id);
             await deleteDoc(docRef);
+            await logActivity(user, "Suppression d'une réunion", { docId: id, objet: reunion.objet });
             toast({
                 title: "Suppression réussie",
                 description: "La réunion a été supprimée.",

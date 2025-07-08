@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { useAuth } from '@/hooks/use-auth'
+import { logActivity } from '@/lib/activityLogger'
 
 
 // A component to render individual form fields based on the AI response
@@ -88,6 +89,7 @@ export default function FormBuilderPage() {
     try {
       const result = await generateForm(topic)
       setGeneratedForm(result)
+      await logActivity(user, "Génération d'un formulaire par IA", { topic });
     } catch (error) {
       console.error("Error generating form:", error)
       toast({
@@ -111,13 +113,14 @@ export default function FormBuilderPage() {
     }
     setIsSaving(true);
     try {
-        await addDoc(collection(db, "formTemplates"), {
+        const newDocRef = await addDoc(collection(db, "formTemplates"), {
             ...generatedForm,
             topic: topic,
             createdBy: user.uid,
             userEmail: user.email,
             createdAt: serverTimestamp(),
         });
+        await logActivity(user, "Sauvegarde d'un modèle de formulaire", { docId: newDocRef.id, title: generatedForm.title });
         toast({
           title: "Modèle Enregistré",
           description: "La structure de ce formulaire a été sauvegardée avec succès.",

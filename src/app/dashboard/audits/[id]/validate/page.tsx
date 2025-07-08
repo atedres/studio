@@ -28,6 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth';
+import { logActivity } from '@/lib/activityLogger';
 
 // Interfaces should match the ones in [id]/page.tsx for consistency
 interface Anomaly {
@@ -110,6 +111,8 @@ export default function ValidateDialogueSecuritePage() {
         };
         let toastTitle = "";
         let toastDescription = "";
+        let actionString = "";
+        let details: Record<string, any> = { docId: id };
 
         try {
             switch(action) {
@@ -117,6 +120,7 @@ export default function ValidateDialogueSecuritePage() {
                     updateData.status = "Validé";
                     toastTitle = "Dialogue Validé";
                     toastDescription = "Le dialogue de sécurité a été approuvé avec succès.";
+                    actionString = "Validation du Dialogue Sécurité";
                     break;
                 case 'reject':
                     if (!rejectionReason) {
@@ -128,6 +132,8 @@ export default function ValidateDialogueSecuritePage() {
                     updateData.rejetMotif = rejectionReason;
                     toastTitle = "Dialogue Rejeté";
                     toastDescription = "Le dialogue de sécurité a été rejeté.";
+                    actionString = "Rejet du Dialogue Sécurité";
+                    details.motif = rejectionReason;
                     break;
                 case 'requestCorrection':
                     if (!correctionComment) {
@@ -139,10 +145,16 @@ export default function ValidateDialogueSecuritePage() {
                     updateData.demandeCorrectionCommentaire = correctionComment;
                     toastTitle = "Demande de Correction Envoyée";
                     toastDescription = "L'auteur a été notifié pour corriger sa soumission.";
+                    actionString = "Demande de correction sur le Dialogue Sécurité";
+                    details.commentaire = correctionComment;
                     break;
             }
 
             await updateDoc(docRef, updateData);
+            if (actionString) {
+                await logActivity(user, actionString, details);
+            }
+
             toast({ title: toastTitle, description: toastDescription });
             router.push('/dashboard/audits');
         } catch (error) {

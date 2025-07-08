@@ -23,6 +23,7 @@ import { Calendar as CalendarIcon, ArrowLeft, Loader2 } from "lucide-react"
 import { db, storage } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
+import { logActivity } from '@/lib/activityLogger'
 
 const reunionSchema = z.object({
   nature: z.enum(["presentielle", "distancielle"], { required_error: "La nature de la réunion est requise." }),
@@ -108,7 +109,8 @@ export default function NewReunionPage() {
     };
 
     try {
-      await addDoc(collection(db, "reunions"), dataToSubmit);
+      const newDocRef = await addDoc(collection(db, "reunions"), dataToSubmit);
+      await logActivity(user, "Planification d'une réunion", { docId: newDocRef.id, objet: data.objet });
       toast({
         title: "Réunion Programmée",
         description: "La réunion a été ajoutée au planning.",

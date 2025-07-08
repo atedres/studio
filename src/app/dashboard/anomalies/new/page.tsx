@@ -23,6 +23,7 @@ import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2 } from
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore"
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
+import { logActivity } from '@/lib/activityLogger'
 
 
 const chasseAuxAnomaliesSchema = z.object({
@@ -146,13 +147,14 @@ export default function NewChasseAuxAnomaliesPage() {
     }
     setIsSubmitting(true)
     try {
-      await addDoc(collection(db, "chassesAuxAnomalies"), {
+      const newDocRef = await addDoc(collection(db, "chassesAuxAnomalies"), {
         ...data,
         createdBy: user.uid,
         userEmail: user.email,
         createdAt: serverTimestamp(),
         status: "Ouverte", // Initial status
       });
+      await logActivity(user, "Création d'une Chasse aux Anomalies", { docId: newDocRef.id });
       toast({
         title: "Formulaire Soumis",
         description: "La Chasse Aux Anomalies (CAA) a été enregistrée.",
@@ -182,13 +184,14 @@ export default function NewChasseAuxAnomaliesPage() {
     setIsSubmitting(true)
     const data = form.getValues();
     try {
-      await addDoc(collection(db, "chassesAuxAnomalies"), {
+      const newDocRef = await addDoc(collection(db, "chassesAuxAnomalies"), {
         ...data,
         status: "Brouillon",
         createdBy: user.uid,
         userEmail: user.email,
         createdAt: serverTimestamp(),
       });
+      await logActivity(user, "Enregistrement d'un brouillon de CAA", { docId: newDocRef.id });
       toast({
         title: "Brouillon Enregistré",
         description: "La CAA a été sauvegardée en tant que brouillon.",

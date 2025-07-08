@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Archive,
   ClipboardCheck,
+  History,
   Inbox,
   LayoutDashboard,
   ListChecks,
@@ -43,6 +44,7 @@ const navItems = [
   { href: "/dashboard/form-builder", icon: Wrench, label: "Générateur IA", roles: ['niveau3', 'niveau4', 'niveau5', 'admin'] },
   { href: "/dashboard/templates", icon: Archive, label: "Modèles de Formulaires", roles: ['niveau3', 'niveau4', 'niveau5', 'admin'] },
   { href: "/dashboard/submissions", icon: Inbox, label: "Soumissions", roles: ['niveau3', 'niveau4', 'niveau5', 'admin'] },
+  { href: "/dashboard/activity-log", icon: History, label: "Journal d'activité", roles: ['admin'] },
   { href: "/dashboard/settings", icon: Settings, label: "Paramètres", roles: ['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
 ]
 
