@@ -102,11 +102,8 @@ const ActionsImmediatesArray = ({ nestIndex, control }: { nestIndex: number; con
   );
 };
 
-// Define more specific types for our list data
-interface Zone { id: string; nom: string; }
-interface Poste { id: string; nom: string; zone: string; }
-interface Activite { id: string; nom: string; zone: string; }
-interface FamilleRisque { id: string; nom: string; types: string[]; }
+interface Zone { id: string; nom: string; postes?: string[]; activites?: string[]; }
+interface FamilleRisque { id: string; nom: string; types?: string[]; }
 
 
 export default function NewDialogueSecuritePage() {
@@ -118,16 +115,12 @@ export default function NewDialogueSecuritePage() {
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false)
   const [openEcheancePopovers, setOpenEcheancePopovers] = React.useState<Record<number, boolean>>({})
 
-  // State for lists
   const [zones, setZones] = useState<Zone[]>([]);
-  const [postes, setPostes] = useState<Poste[]>([]);
-  const [activites, setActivites] = useState<Activite[]>([]);
   const [familles, setFamilles] = useState<FamilleRisque[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
 
-  // State for filtered lists
-  const [filteredPostes, setFilteredPostes] = useState<Poste[]>([]);
-  const [filteredActivites, setFilteredActivites] = useState<Activite[]>([]);
+  const [filteredPostes, setFilteredPostes] = useState<string[]>([]);
+  const [filteredActivites, setFilteredActivites] = useState<string[]>([]);
 
   const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
   const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
@@ -150,7 +143,7 @@ export default function NewDialogueSecuritePage() {
     const fetchLists = async () => {
         setLoadingLists(true);
         try {
-            const fetchData = async (collectionName: string) => {
+            const fetchCollection = async (collectionName: string) => {
                 const q = query(collection(db, collectionName), where("actif", "==", true));
                 const snapshot = await getDocs(q);
                 return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
@@ -163,19 +156,14 @@ export default function NewDialogueSecuritePage() {
                 setUsers(usersList);
             };
 
-            const [zonesData, postesData, activitesData, famillesData] = await Promise.all([
-                fetchData("zonesDeTravail"),
-                fetchData("postesDeTravail"),
-                fetchData("activitesObservees"),
-                fetchData("famillesDeRisque"),
+            const [zonesData, famillesData] = await Promise.all([
+                fetchCollection("zonesDeTravail"),
+                fetchCollection("famillesDeRisque"),
+                fetchUsers()
             ]);
             
             setZones(zonesData);
-            setPostes(postesData);
-            setActivites(activitesData);
             setFamilles(famillesData);
-
-            await fetchUsers();
 
         } catch (error) {
             console.error("Error fetching lists: ", error);
@@ -192,18 +180,18 @@ export default function NewDialogueSecuritePage() {
     fetchLists();
   }, [toast]);
   
-  const selectedZone = form.watch('zone');
+  const selectedZoneName = form.watch('zone');
 
   useEffect(() => {
-    if (selectedZone) {
-      setFilteredPostes(postes.filter(p => p.zone === selectedZone));
-      setFilteredActivites(activites.filter(a => a.zone === selectedZone));
+    if (selectedZoneName) {
+      const selectedZone = zones.find(z => z.nom === selectedZoneName);
+      setFilteredPostes(selectedZone?.postes || []);
+      setFilteredActivites(selectedZone?.activites || []);
     } else {
-      // When no zone is selected, all items are available but the inputs are disabled.
-      setFilteredPostes(postes);
-      setFilteredActivites(activites);
+      setFilteredPostes([]);
+      setFilteredActivites([]);
     }
-  }, [selectedZone, postes, activites]);
+  }, [selectedZoneName, zones]);
 
 
   const { fields: comportementsFields, append: appendComportement, remove: removeComportement } = useFieldArray({
@@ -433,8 +421,8 @@ export default function NewDialogueSecuritePage() {
                   <FormItem>
                     <FormLabel>Poste de travail</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger disabled={!selectedZone || loadingLists}><SelectValue placeholder={!selectedZone ? "Choisir une zone d'abord" : "Sélectionner..."} /></SelectTrigger></FormControl>
-                        <SelectContent>{filteredPostes.map(item => <SelectItem key={item.id} value={item.nom}>{item.nom}</SelectItem>)}</SelectContent>
+                        <FormControl><SelectTrigger disabled={!selectedZoneName || loadingLists}><SelectValue placeholder={!selectedZoneName ? "Choisir une zone d'abord" : "Sélectionner..."} /></SelectTrigger></FormControl>
+                        <SelectContent>{filteredPostes.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
@@ -443,8 +431,8 @@ export default function NewDialogueSecuritePage() {
                   <FormItem>
                     <FormLabel>Activité observée</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger disabled={!selectedZone || loadingLists}><SelectValue placeholder={!selectedZone ? "Choisir une zone d'abord" : "Sélectionner..."} /></SelectTrigger></FormControl>
-                        <SelectContent>{filteredActivites.map(item => <SelectItem key={item.id} value={item.nom}>{item.nom}</SelectItem>)}</SelectContent>
+                        <FormControl><SelectTrigger disabled={!selectedZoneName || loadingLists}><SelectValue placeholder={!selectedZoneName ? "Choisir une zone d'abord" : "Sélectionner..."} /></SelectTrigger></FormControl>
+                        <SelectContent>{filteredActivites.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
@@ -522,7 +510,7 @@ export default function NewDialogueSecuritePage() {
             <CardContent className="space-y-6">
                 {anomaliesFields.map((field, index) => {
                     const selectedType = form.watch(`anomalies.${index}.type`);
-                    const filteredFamilles = familles.filter(f => f.types.includes(selectedType));
+                    const filteredFamilles = familles.filter(f => f.types?.includes(selectedType));
 
                     return (
                     <div key={field.id} className="p-4 border rounded-lg space-y-4 relative">

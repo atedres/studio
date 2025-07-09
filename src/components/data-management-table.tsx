@@ -3,14 +3,17 @@
 
 import React, { useState, useEffect, useCallback } from "react"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, addDoc, updateDoc, doc, query, orderBy, deleteDoc } from "firebase/firestore"
+import { collection, getDocs, addDoc, updateDoc, doc, query, orderBy, where, deleteDoc } from "firebase/firestore"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import { logActivity } from "@/lib/activityLogger"
+import { useForm, Controller } from "react-hook-form"
+import * as z from "zod"
+import { zodResolver } from "@hookform/resolvers/zod"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -18,29 +21,53 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Loader2, PlusCircle, Edit, Trash2 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
+import { MultiSelect, Option } from "./ui/multi-select"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "./ui/form"
 
-interface DataItem {
+interface DataItem extends Record<string, any> {
     id: string;
     nom: string;
     actif: boolean;
 }
 
+interface Relation {
+    collectionName?: string;
+    staticOptions?: string[];
+    label: string;
+    fieldName: string;
+}
+
 interface DataManagementTableProps {
     collectionName: string;
     title: string;
+    relations?: Relation[];
 }
 
-export function DataManagementTable({ collectionName, title }: DataManagementTableProps) {
+export function DataManagementTable({ collectionName, title, relations = [] }: DataManagementTableProps) {
     const [items, setItems] = useState<DataItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+    const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<DataItem | null>(null);
-    const [newItemName, setNewItemName] = useState("");
-    const [editedItemName, setEditedItemName] = useState("");
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [relationOptions, setRelationOptions] = useState<Record<string, Option[]>>({});
+    const [loadingRelations, setLoadingRelations] = useState(false);
     const { toast } = useToast();
     const { user } = useAuth();
+    
+    // Create a dynamic Zod schema
+    const formSchema = z.object({
+        nom: z.string().min(1, "Le nom est requis."),
+        ...relations.reduce((acc, rel) => {
+            acc[rel.fieldName] = z.array(z.string()).optional();
+            return acc;
+        }, {} as Record<string, z.ZodTypeAny>)
+    });
+
+    type FormValues = z.infer<typeof formSchema>;
+    
+    const form = useForm<FormValues>({
+        resolver: zodResolver(formSchema),
+        defaultValues: { nom: "" },
+    });
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -56,10 +83,34 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
             setLoading(false);
         }
     }, [collectionName, title, toast]);
-
+    
+    const fetchRelationData = useCallback(async () => {
+        if (relations.length === 0) return;
+        setLoadingRelations(true);
+        try {
+            const options: Record<string, Option[]> = {};
+            for (const rel of relations) {
+                if (rel.collectionName) {
+                    const q = query(collection(db, rel.collectionName), where("actif", "==", true), orderBy("nom"));
+                    const snapshot = await getDocs(q);
+                    options[rel.fieldName] = snapshot.docs.map(doc => ({ value: doc.data().nom, label: doc.data().nom }));
+                } else if (rel.staticOptions) {
+                    options[rel.fieldName] = rel.staticOptions.map(opt => ({ value: opt, label: opt }));
+                }
+            }
+            setRelationOptions(options);
+        } catch (error) {
+            console.error("Error fetching relation data:", error);
+            toast({ variant: "destructive", title: "Erreur", description: "Impossible de charger les listes de relations." });
+        } finally {
+            setLoadingRelations(false);
+        }
+    }, [relations, toast]);
+    
     useEffect(() => {
         fetchData();
-    }, [fetchData]);
+        fetchRelationData();
+    }, [fetchData, fetchRelationData]);
 
     const handleToggleActive = async (item: DataItem) => {
         const itemRef = doc(db, collectionName, item.id);
@@ -74,132 +125,93 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
         }
     };
 
-    const handleAddItem = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const trimmedName = newItemName.trim();
-        if (!trimmedName) {
-            toast({ variant: "destructive", title: "Erreur", description: "Le nom ne peut pas être vide." });
-            return;
-        }
-        
-        const isDuplicate = items.some(item => item.nom.toLowerCase() === trimmedName.toLowerCase());
-        if (isDuplicate) {
-            toast({ variant: "destructive", title: "Erreur", description: `L'élément "${trimmedName}" existe déjà.` });
-            return;
-        }
-
-        setIsSubmitting(true);
-        try {
-            await addDoc(collection(db, collectionName), {
-                nom: trimmedName,
-                actif: true,
-            });
-            await logActivity(user, `Ajout à "${title}"`, { name: trimmedName });
-            toast({ title: "Succès", description: `"${trimmedName}" a été ajouté à ${title}.` });
-            setNewItemName("");
-            setIsAddDialogOpen(false);
-            fetchData(); // Refresh data
-        } catch (error) {
-            console.error("Error adding document: ", error);
-            toast({ variant: "destructive", title: "Erreur", description: "Impossible d'ajouter l'élément." });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    const handleEditClick = (item: DataItem) => {
+    const handleOpenDialog = (item: DataItem | null) => {
         setEditingItem(item);
-        setEditedItemName(item.nom);
-        setIsEditDialogOpen(true);
+        if (item) {
+            const defaultValues: FormValues = { nom: item.nom };
+            relations.forEach(rel => {
+                defaultValues[rel.fieldName] = item[rel.fieldName] || [];
+            });
+            form.reset(defaultValues);
+        } else {
+            const defaultValues: FormValues = { nom: "" };
+            relations.forEach(rel => {
+                defaultValues[rel.fieldName] = [];
+            });
+            form.reset(defaultValues);
+        }
+        setIsDialogOpen(true);
     };
-    
-    const handleUpdateItem = async (e: React.FormEvent) => {
-        e.preventDefault();
-        const trimmedName = editedItemName.trim();
-        if (!editingItem || !trimmedName) {
-            toast({ variant: "destructive", title: "Erreur", description: "Le nom ne peut pas être vide." });
-            return;
-        }
 
-        const isDuplicate = items.some(item => item.id !== editingItem.id && item.nom.toLowerCase() === trimmedName.toLowerCase());
+    const handleFormSubmit = async (values: FormValues) => {
+        const trimmedName = values.nom.trim();
+        const isDuplicate = items.some(item => 
+            item.nom.toLowerCase() === trimmedName.toLowerCase() && item.id !== editingItem?.id
+        );
         if (isDuplicate) {
-            toast({ variant: "destructive", title: "Erreur", description: `Un autre élément avec le nom "${trimmedName}" existe déjà.` });
+            form.setError("nom", { message: `L'élément "${trimmedName}" existe déjà.`})
             return;
         }
 
-        setIsSubmitting(true);
-        const itemRef = doc(db, collectionName, editingItem.id);
+        const dataToSave: Record<string, any> = { nom: trimmedName };
+        relations.forEach(rel => {
+            dataToSave[rel.fieldName] = values[rel.fieldName] || [];
+        });
+
+        form.formState.isSubmitting = true;
         try {
-            await updateDoc(itemRef, { nom: trimmedName });
-            await logActivity(user, `Modification de "${title}"`, { oldName: editingItem.nom, newName: trimmedName });
-            toast({ title: "Succès", description: `L'élément a été renommé en "${trimmedName}".` });
-            setEditingItem(null);
-            setEditedItemName("");
-            setIsEditDialogOpen(false);
-            fetchData(); // Refresh data
+            if (editingItem) {
+                // Update
+                const itemRef = doc(db, collectionName, editingItem.id);
+                await updateDoc(itemRef, dataToSave);
+                await logActivity(user, `Modification de "${title}"`, { oldName: editingItem.nom, newName: trimmedName });
+                toast({ title: "Succès", description: `L'élément a été mis à jour.` });
+            } else {
+                // Add
+                await addDoc(collection(db, collectionName), { ...dataToSave, actif: true });
+                await logActivity(user, `Ajout à "${title}"`, { name: trimmedName });
+                toast({ title: "Succès", description: `"${trimmedName}" a été ajouté.` });
+            }
+            setIsDialogOpen(false);
+            fetchData();
         } catch (error) {
-             console.error("Error updating document: ", error);
-            toast({ variant: "destructive", title: "Erreur", description: "Impossible de modifier l'élément." });
+            console.error("Error saving item: ", error);
+            toast({ variant: "destructive", title: "Erreur", description: "Impossible d'enregistrer l'élément." });
         } finally {
-            setIsSubmitting(false);
+            form.formState.isSubmitting = false;
         }
-    }
+    };
 
     const handleDeleteItem = async (itemId: string) => {
         const itemToDelete = items.find(i => i.id === itemId);
         if (!itemToDelete) return;
 
-        setIsSubmitting(true);
+        form.formState.isSubmitting = true;
         const itemRef = doc(db, collectionName, itemId);
         try {
             await deleteDoc(itemRef);
             await logActivity(user, `Suppression de "${title}"`, { name: itemToDelete.nom });
             toast({ title: "Succès", description: "L'élément a été supprimé." });
-            fetchData(); // Refresh data
+            fetchData();
         } catch (error) {
             console.error("Error deleting document: ", error);
             toast({ variant: "destructive", title: "Erreur", description: "Impossible de supprimer l'élément." });
         } finally {
-            setIsSubmitting(false);
+             form.formState.isSubmitting = false;
         }
     }
 
     return (
         <div>
             <div className="flex justify-end mb-4">
-                <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                    <DialogTrigger asChild>
-                        <Button><PlusCircle className="mr-2 h-4 w-4" /> Ajouter</Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <DialogHeader>
-                            <DialogTitle>Ajouter à "{title}"</DialogTitle>
-                            <DialogDescription>
-                                Entrez le nom du nouvel élément que vous souhaitez ajouter à la liste.
-                            </DialogDescription>
-                        </DialogHeader>
-                        <form onSubmit={handleAddItem}>
-                            <div className="grid gap-4 py-4">
-                                <div className="grid grid-cols-4 items-center gap-4">
-                                    <Label htmlFor="name" className="text-right">Nom</Label>
-                                    <Input id="name" value={newItemName} onChange={(e) => setNewItemName(e.target.value)} className="col-span-3" />
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button type="submit" disabled={isSubmitting}>
-                                    {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Enregistrer
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
+                 <Button onClick={() => handleOpenDialog(null)}><PlusCircle className="mr-2 h-4 w-4" /> Ajouter</Button>
             </div>
             <div className="border rounded-md">
                 <Table>
                     <TableHeader>
                         <TableRow>
                             <TableHead>Nom</TableHead>
+                            <TableHead>Éléments Liés</TableHead>
                             <TableHead className="w-[100px]">Actif</TableHead>
                             <TableHead className="w-[120px] text-right">Actions</TableHead>
                         </TableRow>
@@ -208,6 +220,7 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
                         {loading ? (
                             [...Array(5)].map((_, i) => (
                                 <TableRow key={i}>
+                                    <TableCell><Skeleton className="h-4 w-1/2" /></TableCell>
                                     <TableCell><Skeleton className="h-4 w-3/4" /></TableCell>
                                     <TableCell><Skeleton className="h-6 w-12" /></TableCell>
                                     <TableCell className="text-right space-x-2">
@@ -220,6 +233,17 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
                             items.map((item) => (
                                 <TableRow key={item.id}>
                                     <TableCell className="font-medium">{item.nom}</TableCell>
+                                    <TableCell className="text-xs text-muted-foreground">
+                                        {relations.map(rel => {
+                                            const relatedItems = item[rel.fieldName] as string[] | undefined;
+                                            if (!relatedItems || relatedItems.length === 0) return null;
+                                            return (
+                                                <div key={rel.fieldName}>
+                                                    <strong className="font-semibold">{rel.label}:</strong> {relatedItems.join(", ")}
+                                                </div>
+                                            )
+                                        })}
+                                    </TableCell>
                                     <TableCell>
                                         <Switch
                                             checked={item.actif}
@@ -227,7 +251,7 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
                                         />
                                     </TableCell>
                                     <TableCell className="text-right space-x-2">
-                                        <Button variant="ghost" size="icon" onClick={() => handleEditClick(item)}>
+                                        <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(item)}>
                                             <Edit className="h-4 w-4" />
                                             <span className="sr-only">Modifier</span>
                                         </Button>
@@ -250,9 +274,9 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
                                                 <AlertDialogAction
                                                     onClick={() => handleDeleteItem(item.id)}
                                                     className={cn(buttonVariants({ variant: "destructive" }))}
-                                                    disabled={isSubmitting}
+                                                    disabled={form.formState.isSubmitting}
                                                 >
-                                                   {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Supprimer
+                                                   {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Supprimer
                                                 </AlertDialogAction>
                                                 </AlertDialogFooter>
                                             </AlertDialogContent>
@@ -262,7 +286,7 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
                             ))
                         ) : (
                             <TableRow>
-                                <TableCell colSpan={3} className="h-24 text-center">
+                                <TableCell colSpan={4} className="h-24 text-center">
                                     Aucun élément trouvé.
                                 </TableCell>
                             </TableRow>
@@ -271,29 +295,57 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
                 </Table>
             </div>
             
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                <DialogContent className="sm:max-w-[425px]">
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogContent className="sm:max-w-md">
                     <DialogHeader>
-                        <DialogTitle>Modifier "{editingItem?.nom}"</DialogTitle>
-                        <DialogDescription>
-                            Entrez le nouveau nom pour cet élément.
-                        </DialogDescription>
+                        <DialogTitle>{editingItem ? `Modifier "${editingItem.nom}"` : `Ajouter à "${title}"`}</DialogTitle>
                     </DialogHeader>
-                    <form onSubmit={handleUpdateItem}>
-                        <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
-                                <Label htmlFor="edit-name" className="text-right">Nom</Label>
-                                <Input id="edit-name" value={editedItemName} onChange={(e) => setEditedItemName(e.target.value)} className="col-span-3" />
-                            </div>
-                        </div>
-                        <DialogFooter>
-                            <Button type="button" variant="secondary" onClick={() => setIsEditDialogOpen(false)}>Annuler</Button>
-                            <Button type="submit" disabled={isSubmitting}>
-                                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Enregistrer
-                            </Button>
-                        </DialogFooter>
-                    </form>
+                    <Form {...form}>
+                        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+                             <FormField
+                                control={form.control}
+                                name="nom"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Nom</FormLabel>
+                                        <FormControl>
+                                            <Input placeholder="Nom de l'élément" {...field} />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+
+                            {relations.map(rel => (
+                                 <FormField
+                                    key={rel.fieldName}
+                                    control={form.control}
+                                    name={rel.fieldName as any}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>{rel.label}</FormLabel>
+                                            <FormControl>
+                                                <MultiSelect
+                                                    options={relationOptions[rel.fieldName] || []}
+                                                    selected={field.value || []}
+                                                    onChange={field.onChange}
+                                                    placeholder={`Sélectionner...`}
+                                                />
+                                            </FormControl>
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            ))}
+                            <DialogFooter>
+                                 <Button type="button" variant="secondary" onClick={() => setIsDialogOpen(false)}>Annuler</Button>
+                                <Button type="submit" disabled={form.formState.isSubmitting}>
+                                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Enregistrer
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </Form>
                 </DialogContent>
             </Dialog>
         </div>
