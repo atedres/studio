@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -92,60 +92,59 @@ export default function UserManagementPage() {
     }
   });
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setLoadingUsers(true);
+  const fetchUsers = useCallback(async () => {
+    setLoadingUsers(true);
+    try {
+      const usersCollection = collection(db, "users");
+      const usersSnapshot = await getDocs(usersCollection);
+      const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AppUserDoc[];
+      setUsers(usersList);
+    } catch (error) {
+      console.error("Error fetching users: ", error);
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: "Impossible de charger la liste des utilisateurs.",
+      });
+    } finally {
+      setLoadingUsers(false);
+    }
+  }, [toast]);
+  
+  const fetchLists = useCallback(async () => {
+      setLoadingLists(true);
       try {
-        const usersCollection = collection(db, "users");
-        const usersSnapshot = await getDocs(usersCollection);
-        const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as AppUserDoc[];
-        setUsers(usersList);
+          const fetchData = async (collectionName: string) => {
+              const q = query(collection(db, collectionName), where("actif", "==", true));
+              const snapshot = await getDocs(q);
+              return snapshot.docs.map(doc => doc.data().nom as string);
+          };
+
+          const [postesData, entitesData] = await Promise.all([
+              fetchData("postesDeTravail"),
+              fetchData("zonesDeTravail") // 'Entité' corresponds to 'zonesDeTravail'
+          ]);
+          
+          setPostes(postesData);
+          setEntites(entitesData);
+
       } catch (error) {
-        console.error("Error fetching users: ", error);
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Impossible de charger la liste des utilisateurs.",
-        });
+          console.error("Error fetching lists for settings: ", error);
+          toast({
+              variant: "destructive",
+              title: "Erreur de chargement",
+              description: "Impossible de charger les listes pour les postes et entités.",
+          });
       } finally {
-        setLoadingUsers(false);
+          setLoadingLists(false);
       }
-    };
-    fetchUsers();
   }, [toast]);
+
 
   useEffect(() => {
-    const fetchLists = async () => {
-        setLoadingLists(true);
-        try {
-            const fetchData = async (collectionName: string) => {
-                const q = query(collection(db, collectionName), where("actif", "==", true));
-                const snapshot = await getDocs(q);
-                return snapshot.docs.map(doc => doc.data().nom as string);
-            };
-
-            const [postesData, entitesData] = await Promise.all([
-                fetchData("postesDeTravail"),
-                fetchData("zonesDeTravail") // 'Entité' corresponds to 'zonesDeTravail'
-            ]);
-            
-            setPostes(postesData);
-            setEntites(entitesData);
-
-        } catch (error) {
-            console.error("Error fetching lists for settings: ", error);
-            toast({
-                variant: "destructive",
-                title: "Erreur de chargement",
-                description: "Impossible de charger les listes pour les postes et entités.",
-            });
-        } finally {
-            setLoadingLists(false);
-        }
-    };
-
+    fetchUsers();
     fetchLists();
-  }, [toast]);
+  }, [fetchUsers, fetchLists]);
 
 
   const handleRoleChange = async (userId: string, newRole: string) => {
@@ -187,11 +186,9 @@ export default function UserManagementPage() {
 
     try {
       await updateUserDocument(editingUser.id, values);
-      setUsers(prevUsers => 
-        prevUsers.map(u => 
-          u.id === editingUser.id ? { ...u, ...values, displayName: `${values.firstName} ${values.lastName}` } : u
-        )
-      );
+      
+      await fetchUsers(); // Re-fetch the user list to get the latest data
+      
       await logActivity(adminUser, "Modification des informations de l'utilisateur", { targetUserEmail: editingUser.email });
       toast({
         title: "Utilisateur mis à jour",
@@ -246,16 +243,7 @@ export default function UserManagementPage() {
 
         await logActivity(adminUser, "Création d'un utilisateur", { newUserEmail: values.email, role: values.role });
         
-        setUsers(prev => [...prev, { 
-            id: newUser.uid, 
-            email: newUser.email!, 
-            displayName: displayName, 
-            role: values.role,
-            firstName: values.firstName,
-            lastName: values.lastName,
-            position: values.position,
-            entity: values.entity
-        }]);
+        await fetchUsers(); // Re-fetch user list after creation
 
         toast({
             title: "Utilisateur créé avec succès",
