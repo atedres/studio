@@ -21,10 +21,11 @@ export async function rewriteDescription(input: RewriteDescriptionInput): Promis
   return rewriteDescriptionFlow(input);
 }
 
+// The output schema has been removed from the prompt definition to prevent validation errors
+// when the model returns a null or empty response. The flow will handle the response instead.
 const prompt = ai.definePrompt({
   name: 'rewriteDescriptionPrompt',
   input: { schema: RewriteDescriptionInputSchema },
-  output: { schema: RewriteDescriptionOutputSchema },
   prompt: `You are an expert in Health, Safety, and Environment (HSE) for industrial settings.
 Your task is to rewrite the user's description of an anomaly to be more clear, professional, and precise.
 The output should be only the rewritten text, without any preamble or explanation. The language must be French.
@@ -40,9 +41,11 @@ const rewriteDescriptionFlow = ai.defineFlow(
     outputSchema: RewriteDescriptionOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
-    // If the model returns a null or undefined response, return an empty string
-    // to satisfy the output schema and prevent an error.
-    return output || "";
+    // When a prompt has no output schema, it returns a GenerateResponse object.
+    const response = await prompt(input);
+    
+    // We access the model's text output and ensure we return a string,
+    // even if the response is empty, to satisfy the flow's output schema.
+    return response.text || "";
   }
 );
