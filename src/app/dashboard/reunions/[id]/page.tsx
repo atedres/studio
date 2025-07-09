@@ -77,7 +77,20 @@ export default function ReunionDetailPage() {
                 setReunion(reunionData);
 
                 const formattedDate = format(reunionData.date.toDate(), 'dd/MM/yyyy', { locale: fr });
-                const message = `Invitation : Réunion SST\n\nObjet: ${reunionData.objet}\nDate: ${formattedDate}\nHeure: ${reunionData.heure}\nLieu/Lien: ${reunionData.lieu}\nAnimateur: ${reunionData.animateur}`;
+                const message = `Bonjour,
+
+Vous êtes invité(e) à participer à la réunion SST suivante :
+
+- Objet : ${reunionData.objet}
+- Date : ${formattedDate}
+- Heure : ${reunionData.heure}
+- Lieu / Lien : ${reunionData.lieu}
+- Animateur : ${reunionData.animateur}
+
+Votre présence est importante.
+
+Cordialement,
+L'équipe HSE SOMASTEEL`;
                 setShareMessage(message);
 
             } else {
