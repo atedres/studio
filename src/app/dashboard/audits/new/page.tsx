@@ -198,20 +198,12 @@ export default function NewDialogueSecuritePage() {
     if (selectedZone) {
       setFilteredPostes(postes.filter(p => p.zone === selectedZone));
       setFilteredActivites(activites.filter(a => a.zone === selectedZone));
-      // Reset dependent fields if their current value is not in the new filtered list
-      const currentPoste = form.getValues('poste');
-      if (currentPoste && !postes.some(p => p.zone === selectedZone && p.nom === currentPoste)) {
-        form.setValue('poste', '');
-      }
-      const currentActivite = form.getValues('activite');
-      if (currentActivite && !activites.some(a => a.zone === selectedZone && a.nom === currentActivite)) {
-        form.setValue('activite', '');
-      }
     } else {
-      setFilteredPostes([]);
-      setFilteredActivites([]);
+      // When no zone is selected, all items are available but the inputs are disabled.
+      setFilteredPostes(postes);
+      setFilteredActivites(activites);
     }
-  }, [selectedZone, postes, activites, form]);
+  }, [selectedZone, postes, activites]);
 
 
   const { fields: comportementsFields, append: appendComportement, remove: removeComportement } = useFieldArray({
