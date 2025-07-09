@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
-import { FilePlus2, Eye, TrendingUp, AlertOctagon, UserCheck, ListChecks } from "lucide-react"
+import { FilePlus2, Eye, TrendingUp, AlertOctagon, UserCheck, ListChecks, MoreHorizontal, Check, X, MessageSquare, Loader2 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,10 +24,17 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, orderBy, where } from "firebase/firestore"
+import { collection, getDocs, query, orderBy, where, doc, updateDoc, serverTimestamp } from "firebase/firestore"
 import { startOfMonth } from 'date-fns'
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts"
 import { useAuth } from "@/hooks/use-auth"
+import { useToast } from "@/hooks/use-toast"
+import { logActivity } from "@/lib/activityLogger"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
 
 
 interface Anomaly {
@@ -72,8 +79,18 @@ export default function DialoguesSecuritePage() {
   const [stats, setStats] = useState<DialogueStats | null>(null)
   const [loading, setLoading] = useState(true)
   const { user } = useAuth();
+  const { toast } = useToast();
   
   const canManage = user && ['niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
+
+  // State for handling actions
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeDialogue, setActiveDialogue] = useState<Dialogue | null>(null);
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [isCorrectionDialogOpen, setIsCorrectionDialogOpen] = useState(false);
+  const [correctionComment, setCorrectionComment] = useState("");
+
 
   const { pendingDialogues, historicalDialogues } = useMemo(() => {
     const pending = allDialogues.filter(d => d.status === 'En attente de validation');
@@ -163,6 +180,101 @@ export default function DialoguesSecuritePage() {
     fetchDialogues();
   }, [user]);
 
+  const handleValidateClick = async (dialogue: Dialogue) => {
+    if (isSubmitting) return;
+    setActiveDialogue(dialogue);
+    setIsSubmitting(true);
+    const docRef = doc(db, "dialoguesSecurite", dialogue.id);
+    try {
+        await updateDoc(docRef, {
+            status: "Validé",
+            validePar: user!.displayName || user!.email,
+            dateValidation: serverTimestamp(),
+        });
+        await logActivity(user, "Validation du Dialogue Sécurité", { docId: dialogue.id });
+        setAllDialogues(prev => prev.filter(d => d.id !== dialogue.id));
+        toast({ title: "Dialogue Validé", description: "Le dialogue de sécurité a été approuvé." });
+    } catch (error) {
+        console.error("Error validating document: ", error);
+        toast({ variant: "destructive", title: "Erreur", description: "Une erreur est survenue." });
+    } finally {
+        setIsSubmitting(false);
+        setActiveDialogue(null);
+    }
+  };
+
+  const handleCorrectionClick = (dialogue: Dialogue) => {
+      setActiveDialogue(dialogue);
+      setIsCorrectionDialogOpen(true);
+  };
+  
+  const handleRejectClick = (dialogue: Dialogue) => {
+      setActiveDialogue(dialogue);
+      setIsRejectDialogOpen(true);
+  };
+
+  const handleDialogSubmit = async (action: 'reject' | 'requestCorrection') => {
+      if (!user || !activeDialogue) return;
+      setIsSubmitting(true);
+      const docRef = doc(db, "dialoguesSecurite", activeDialogue.id);
+      
+      let updateData: any = {
+          validePar: user.displayName || user.email,
+          dateValidation: serverTimestamp(),
+      };
+      let toastTitle = "";
+      let toastDescription = "";
+      let actionString = "";
+      let details: Record<string, any> = { docId: activeDialogue.id };
+
+      try {
+          if (action === 'reject') {
+              if (!rejectionReason) {
+                   toast({ variant: "destructive", title: "Erreur", description: "Le motif de rejet est obligatoire." });
+                   setIsSubmitting(false);
+                   return;
+              }
+              updateData.status = "Rejeté";
+              updateData.rejetMotif = rejectionReason;
+              toastTitle = "Dialogue Rejeté";
+              toastDescription = "Le dialogue de sécurité a été rejeté.";
+              actionString = "Rejet du Dialogue Sécurité";
+              details.motif = rejectionReason;
+          } else if (action === 'requestCorrection') {
+              if (!correctionComment) {
+                   toast({ variant: "destructive", title: "Erreur", description: "Un commentaire est requis." });
+                   setIsSubmitting(false);
+                   return;
+              }
+              updateData.status = "À corriger";
+              updateData.demandeCorrectionCommentaire = correctionComment;
+              toastTitle = "Demande de Correction Envoyée";
+              toastDescription = "L'auteur a été notifié.";
+              actionString = "Demande de correction sur le Dialogue Sécurité";
+              details.commentaire = correctionComment;
+          }
+
+          await updateDoc(docRef, updateData);
+          if (actionString) {
+              await logActivity(user, actionString, details);
+          }
+
+          setAllDialogues(prev => prev.filter(d => d.id !== activeDialogue.id));
+          toast({ title: toastTitle, description: toastDescription });
+      } catch (error) {
+          console.error(`Error ${action} document: `, error);
+          toast({ variant: "destructive", title: "Erreur", description: "Une erreur est survenue." });
+      } finally {
+          setIsSubmitting(false);
+          setIsRejectDialogOpen(false);
+          setRejectionReason("");
+          setIsCorrectionDialogOpen(false);
+          setCorrectionComment("");
+          setActiveDialogue(null);
+      }
+  };
+
+
   const getStatusVariant = (status: string) => {
     switch (status) {
       case "Validé":
@@ -227,24 +339,41 @@ export default function DialoguesSecuritePage() {
                 <Badge variant={getStatusVariant(dialogue.status) as any}>{dialogue.status}</Badge>
             </TableCell>
             <TableCell className="text-right">
+                {dialogue.status === 'En attente de validation' && canManage ? (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0" disabled={isSubmitting && activeDialogue?.id === dialogue.id}>
+                                <span className="sr-only">Ouvrir le menu</span>
+                                {isSubmitting && activeDialogue?.id === dialogue.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <MoreHorizontal className="h-4 w-4" />}
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions Rapides</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => handleValidateClick(dialogue)}>
+                                <Check className="mr-2 h-4 w-4" /> Valider
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleCorrectionClick(dialogue)}>
+                                <MessageSquare className="mr-2 h-4 w-4" /> Demander Correction
+                            </DropdownMenuItem>
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleRejectClick(dialogue)}>
+                                <X className="mr-2 h-4 w-4" /> Rejeter
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <Link href={`/dashboard/audits/${dialogue.id}`} passHref>
+                                <DropdownMenuItem>
+                                    <Eye className="mr-2 h-4 w-4" /> Voir les détails
+                                </DropdownMenuItem>
+                            </Link>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                ) : (
                     <Button asChild variant="outline" size="sm">
-                        <Link href={
-                            dialogue.status === 'Brouillon' ? `/dashboard/audits/${dialogue.id}/edit` : 
-                            dialogue.status === 'En attente de validation' && canManage ? `/dashboard/audits/${dialogue.id}/validate` :
-                            `/dashboard/audits/${dialogue.id}`
-                        }>
-                            {dialogue.status === 'En attente de validation' && canManage ? (
-                                <>
-                                 <ListChecks className="mr-2 h-4 w-4" /> Traiter
-                                </>
-                            ): (
-                                <>
-                                  <Eye className="mr-2 h-4 w-4" /> {dialogue.status === 'Brouillon' ? 'Modifier' : 'Voir'}
-                                </>
-                            )}
+                        <Link href={dialogue.status === 'Brouillon' || dialogue.status === 'À corriger' ? `/dashboard/audits/${dialogue.id}/edit` : `/dashboard/audits/${dialogue.id}`}>
+                            <Eye className="mr-2 h-4 w-4" /> {dialogue.status === 'Brouillon' || dialogue.status === 'À corriger' ? 'Modifier' : 'Voir'}
                         </Link>
                     </Button>
-                </TableCell>
+                )}
+            </TableCell>
             </TableRow>
         )) : (
              <TableRow><TableCell colSpan={7} className="h-24 text-center">{emptyMessage}</TableCell></TableRow>
@@ -374,7 +503,50 @@ export default function DialoguesSecuritePage() {
                 </Link>
             </Button>
         </div>
+
+        {/* Action Dialogs */}
+        <AlertDialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Rejeter le Dialogue</AlertDialogTitle>
+                    <AlertDialogDescription>Veuillez fournir un motif de rejet clair. Cette action est définitive.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="grid gap-4 py-4">
+                   <div className="grid gap-2">
+                        <Label htmlFor="rejection-reason">Motif du rejet</Label>
+                        <Textarea id="rejection-reason" placeholder="Ex: Ce dialogue est un doublon..." value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} />
+                    </div>
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel disabled={isSubmitting}>Annuler</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleDialogSubmit('reject')} disabled={isSubmitting || !rejectionReason}>
+                        {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Confirmer le rejet
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={isCorrectionDialogOpen} onOpenChange={setIsCorrectionDialogOpen}>
+             <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Demander une Correction</DialogTitle>
+                    <DialogDescription>Expliquez à l'auteur les modifications nécessaires.</DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                   <div className="grid gap-2">
+                        <Label htmlFor="correction-comment">Commentaire</Label>
+                        <Textarea id="correction-comment" placeholder="Ex: Veuillez détailler davantage l'action corrective pour l'anomalie n°2." value={correctionComment} onChange={(e) => setCorrectionComment(e.target.value)} />
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button variant="secondary" onClick={() => setIsCorrectionDialogOpen(false)} disabled={isSubmitting}>Annuler</Button>
+                    <Button onClick={() => handleDialogSubmit('requestCorrection')} disabled={isSubmitting || !correctionComment}>
+                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Envoyer la demande
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+
     </div>
   )
 }
-
