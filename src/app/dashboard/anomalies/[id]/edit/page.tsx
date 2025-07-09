@@ -347,7 +347,7 @@ export default function EditChasseAuxAnomaliesPage() {
                                     </FormControl>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar mode="single" selected={field.value} onSelect={(date) => {field.onChange(date); setOpenEcheancePopovers(prev => ({...prev, [index]: false}))}} initialFocus />
+                                  <Calendar mode="single" selected={field.value} onSelect={(date) => {field.onChange(date); setOpenEcheancePopovers(prev => ({...prev, [index]: false}))}} disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))} initialFocus />
                                 </PopoverContent>
                               </Popover><FormMessage />
                                 </FormItem>
