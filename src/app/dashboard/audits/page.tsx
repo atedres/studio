@@ -35,6 +35,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
+import { Tooltip as UiTooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 
 interface Anomaly {
@@ -325,11 +326,26 @@ export default function DialoguesSecuritePage() {
             <TableCell>{dialogue.observateur}</TableCell>
             <TableCell>{dialogue.zone}</TableCell>
             <TableCell className="max-w-[300px]">
-                 {dialogue.anomalies.length > 0 ? (
-                    <ul className="list-disc list-inside space-y-1 text-xs">
-                        {dialogue.anomalies.map((anomalie, index) => (
-                            <li key={index} className="truncate" title={anomalie.description}>{anomalie.description}</li>
-                        ))}
+                {dialogue.anomalies.length > 0 ? (
+                    <ul className="space-y-2 text-xs">
+                    {dialogue.anomalies.map((anomalie, index) => (
+                        isPendingTab ? (
+                            <li key={index} className="list-none">
+                                <UiTooltip>
+                                    <TooltipTrigger asChild>
+                                        <span className="font-semibold cursor-help underline decoration-dashed">
+                                            {ANOMALY_TYPE_MAP[anomalie.type] || "Anomalie"}
+                                        </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p className="max-w-[300px] p-2">{anomalie.description}</p>
+                                    </TooltipContent>
+                                </UiTooltip>
+                            </li>
+                        ) : (
+                             <li key={index} className="list-inside list-disc truncate" title={anomalie.description}>{anomalie.description}</li>
+                        )
+                    ))}
                     </ul>
                 ) : (
                     <span className="text-xs text-muted-foreground">Aucune</span>
@@ -376,13 +392,14 @@ export default function DialoguesSecuritePage() {
             </TableCell>
             </TableRow>
         )) : (
-             <TableRow><TableCell colSpan={7} className="h-24 text-center">{emptyMessage}</TableCell></TableRow>
+             <TableRow><TableCell colSpan={6} className="h-24 text-center">{emptyMessage}</TableCell></TableRow>
         )}
         </TableBody>
     </Table>
   );
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight font-headline">Dialogue Sécurité / حوار السلامة</h1>
@@ -548,5 +565,8 @@ export default function DialoguesSecuritePage() {
         </Dialog>
 
     </div>
+    </TooltipProvider>
   )
 }
+
+    
