@@ -76,7 +76,7 @@ const ANOMALY_TYPE_MAP: { [key: string]: string } = {
 
 const demoDialogues: Dialogue[] = [
     { id: 'demo-ds-1', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, observateur: 'A. Saidi', zone: 'Laminoir', anomalies: [{ type: 'AD', description: 'Non-port du casque' }], status: 'Validé' },
-    { id: 'demo-ds-2', date: { seconds: Timestamp.from(subMonths(new Date(), 1)).seconds, nanoseconds: 0 }, observateur: 'M. Tazi', zone: 'Aciérie', anomalies: [], status: 'Clôturée' },
+    { id: 'demo-ds-2', date: { seconds: Timestamp.fromDate(subMonths(new Date(), 1)).seconds, nanoseconds: 0 }, observateur: 'M. Tazi', zone: 'Aciérie', anomalies: [], status: 'Clôturée' },
     { id: 'demo-ds-3', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, observateur: 'L. Bennani', zone: 'Logistique', anomalies: [{ type: 'IS', description: 'Zone de stockage encombrée' }], status: 'En attente de validation' },
     { id: 'demo-ds-4', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, observateur: 'S. Kettani', zone: 'Maintenance', anomalies: [{ type: 'SD', description: 'Garde de protection manquante' }], status: 'À corriger' },
 ];
@@ -601,3 +601,5 @@ export default function DialoguesSecuritePage() {
     </TooltipProvider>
   )
 }
+
+    

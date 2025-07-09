@@ -54,8 +54,8 @@ interface AnomalyStats {
 
 const demoCAAs: CAA[] = [
     { id: 'demo1', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, zone: 'Laminoir', animateur: 'Y. Alaoui', anomalies: [{avancement: 'En cours'}, {avancement: 'Réalisée'}], status: 'Ouverte' },
-    { id: 'demo2', date: { seconds: Timestamp.from(subMonths(new Date(), 1)).seconds, nanoseconds: 0 }, zone: 'Aciérie', animateur: 'F. Ziani', anomalies: [{avancement: 'Réalisée'}], status: 'Clôturée' },
-    { id: 'demo3', date: { seconds: Timestamp.from(subMonths(new Date(), 2)).seconds, nanoseconds: 0 }, zone: 'Logistique', animateur: 'Y. Alaoui', anomalies: [{avancement: 'En cours'}, {avancement: 'En cours'}], status: 'Ouverte' },
+    { id: 'demo2', date: { seconds: Timestamp.fromDate(subMonths(new Date(), 1)).seconds, nanoseconds: 0 }, zone: 'Aciérie', animateur: 'F. Ziani', anomalies: [{avancement: 'Réalisée'}], status: 'Clôturée' },
+    { id: 'demo3', date: { seconds: Timestamp.fromDate(subMonths(new Date(), 2)).seconds, nanoseconds: 0 }, zone: 'Logistique', animateur: 'Y. Alaoui', anomalies: [{avancement: 'En cours'}, {avancement: 'En cours'}], status: 'Ouverte' },
     { id: 'demo4', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, zone: 'Laminoir', animateur: 'A. Saidi', anomalies: [], status: 'Brouillon' },
 ];
 
@@ -348,3 +348,5 @@ export default function AnomaliesPage() {
     </div>
   )
 }
+
+    

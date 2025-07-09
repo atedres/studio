@@ -46,8 +46,8 @@ interface ReunionStats {
 
 const demoReunions: Reunion[] = [
     { id: 'demo-r-1', objet: 'Revue mensuelle de la sécurité', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, heure: '10:00', animateur: 'Y. Alaoui', status: 'Planifiée' },
-    { id: 'demo-r-2', objet: 'Analyse des incidents de la semaine', date: { seconds: Timestamp.from(subMonths(new Date(), 1)).seconds, nanoseconds: 0 }, heure: '14:30', animateur: 'A. Saidi', status: 'Réalisée' },
-    { id: 'demo-r-3', objet: 'Formation aux premiers secours', date: { seconds: Timestamp.from(subMonths(new Date(), 2)).seconds, nanoseconds: 0 }, heure: '09:00', animateur: 'F. Ziani', status: 'Annulée' },
+    { id: 'demo-r-2', objet: 'Analyse des incidents de la semaine', date: { seconds: Timestamp.fromDate(subMonths(new Date(), 1)).seconds, nanoseconds: 0 }, heure: '14:30', animateur: 'A. Saidi', status: 'Réalisée' },
+    { id: 'demo-r-3', objet: 'Formation aux premiers secours', date: { seconds: Timestamp.fromDate(subMonths(new Date(), 2)).seconds, nanoseconds: 0 }, heure: '09:00', animateur: 'F. Ziani', status: 'Annulée' },
 ];
 
 const demoStats: ReunionStats = {
@@ -297,3 +297,5 @@ export default function ReunionsPage() {
     </div>
   )
 }
+
+    
