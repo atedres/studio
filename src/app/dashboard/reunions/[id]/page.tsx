@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Edit, User, CalendarDays, Clock, MapPin, ClipboardList, Info, FileDown, Users as UsersIcon, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit, User, CalendarDays, Clock, MapPin, ClipboardList, Info, FileDown, Users as UsersIcon, Trash2, Loader2, Share2, Mail, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -24,6 +24,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth';
 import { logActivity } from '@/lib/activityLogger';
@@ -55,6 +60,7 @@ export default function ReunionDetailPage() {
     const [reunion, setReunion] = useState<ReunionDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [shareMessage, setShareMessage] = useState("");
 
     const canManage = user && ['niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
 
@@ -67,7 +73,13 @@ export default function ReunionDetailPage() {
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
-                setReunion({ id: docSnap.id, ...docSnap.data() } as ReunionDetails);
+                const reunionData = { id: docSnap.id, ...docSnap.data() } as ReunionDetails;
+                setReunion(reunionData);
+
+                const formattedDate = format(reunionData.date.toDate(), 'dd/MM/yyyy', { locale: fr });
+                const message = `Invitation : Réunion SST\n\nObjet: ${reunionData.objet}\nDate: ${formattedDate}\nHeure: ${reunionData.heure}\nLieu/Lien: ${reunionData.lieu}\nAnimateur: ${reunionData.animateur}`;
+                setShareMessage(message);
+
             } else {
                 console.log("No such document!");
             }
@@ -149,7 +161,7 @@ export default function ReunionDetailPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
                 <div className="flex items-center gap-4">
                      <Button variant="outline" size="icon" onClick={() => router.back()}>
                         <ArrowLeft className="h-4 w-4" />
@@ -164,6 +176,33 @@ export default function ReunionDetailPage() {
                 </div>
                 {canManage && (
                  <div className="flex items-center gap-2">
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline">
+                                <Share2 className="mr-2 h-4 w-4" /> Partager
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-56">
+                            <div className="space-y-2">
+                                <h4 className="font-medium leading-none">Partager l'invitation</h4>
+                                <p className="text-sm text-muted-foreground">
+                                    Envoyez les détails de la réunion.
+                                </p>
+                                <div className="grid gap-2 pt-2">
+                                    <Button asChild size="sm">
+                                        <a href={`https://wa.me/?text=${encodeURIComponent(shareMessage)}`} target="_blank" rel="noopener noreferrer">
+                                            <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
+                                        </a>
+                                    </Button>
+                                    <Button asChild variant="outline" size="sm">
+                                        <a href={`mailto:?subject=${encodeURIComponent(`Invitation: Réunion SST - ${reunion.objet}`)}&body=${encodeURIComponent(shareMessage)}`}>
+                                            <Mail className="mr-2 h-4 w-4" /> Email
+                                        </a>
+                                    </Button>
+                                </div>
+                            </div>
+                        </PopoverContent>
+                    </Popover>
                     <Button asChild>
                         <Link href={`/dashboard/reunions/${reunion.id}/edit`}>
                             <Edit className="mr-2 h-4 w-4" /> Modifier
