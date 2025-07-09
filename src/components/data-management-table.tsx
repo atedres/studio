@@ -158,7 +158,6 @@ export function DataManagementTable({ collectionName, title, relations = [] }: D
             dataToSave[rel.fieldName] = values[rel.fieldName] || [];
         });
 
-        form.formState.isSubmitting = true;
         try {
             if (editingItem) {
                 // Update
@@ -177,8 +176,6 @@ export function DataManagementTable({ collectionName, title, relations = [] }: D
         } catch (error) {
             console.error("Error saving item: ", error);
             toast({ variant: "destructive", title: "Erreur", description: "Impossible d'enregistrer l'élément." });
-        } finally {
-            form.formState.isSubmitting = false;
         }
     };
 
@@ -186,7 +183,6 @@ export function DataManagementTable({ collectionName, title, relations = [] }: D
         const itemToDelete = items.find(i => i.id === itemId);
         if (!itemToDelete) return;
 
-        form.formState.isSubmitting = true;
         const itemRef = doc(db, collectionName, itemId);
         try {
             await deleteDoc(itemRef);
@@ -196,8 +192,6 @@ export function DataManagementTable({ collectionName, title, relations = [] }: D
         } catch (error) {
             console.error("Error deleting document: ", error);
             toast({ variant: "destructive", title: "Erreur", description: "Impossible de supprimer l'élément." });
-        } finally {
-             form.formState.isSubmitting = false;
         }
     }
 
