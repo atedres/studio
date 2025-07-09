@@ -56,6 +56,10 @@ function MultiSelect({ options, selected, onChange, className, placeholder = "Se
           role="combobox"
           aria-expanded={open}
           className={cn("w-full justify-between h-auto min-h-10", className)}
+          onClick={(e) => {
+            e.preventDefault();
+            setOpen((prev) => !prev);
+          }}
         >
           <div className="flex gap-1 flex-wrap">
             {selectedOptions.length > 0 ? (
