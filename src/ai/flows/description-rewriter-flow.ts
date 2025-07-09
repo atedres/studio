@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview An AI-powered text rewriter for HSE descriptions.
@@ -40,6 +41,8 @@ const rewriteDescriptionFlow = ai.defineFlow(
   },
   async (input) => {
     const { output } = await prompt(input);
-    return output!;
+    // If the model returns a null or undefined response, return an empty string
+    // to satisfy the output schema and prevent an error.
+    return output || "";
   }
 );
