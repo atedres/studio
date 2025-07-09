@@ -67,7 +67,7 @@ function MultiSelect({ options, selected, onChange, className, placeholder = "Se
                     <Badge
                         variant="secondary"
                         key={option.value}
-                        className="mr-1"
+                        className="mr-1 mb-1"
                         onClick={(e) => {
                             e.stopPropagation();
                             handleSelect(option.value);
@@ -86,9 +86,9 @@ function MultiSelect({ options, selected, onChange, className, placeholder = "Se
       </PopoverTrigger>
       <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
         <Command>
-          <CommandInput placeholder="Search..." />
+          <CommandInput placeholder="Rechercher..." />
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandEmpty>Aucun résultat.</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
                 <CommandItem

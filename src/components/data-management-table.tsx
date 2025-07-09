@@ -12,37 +12,48 @@ import * as z from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 
 import { Button, buttonVariants } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Loader2, PlusCircle, Edit, Trash2 } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "./ui/form"
+import { MultiSelect, Option } from "./ui/multi-select"
 
 interface DataItem extends Record<string, any> {
     id: string;
     nom: string;
     actif: boolean;
+    zones?: string[];
+    types?: string[];
+}
+
+interface RelationConfig {
+    collectionName: string;
+    label: string;
+    formField: "zones" | "types";
 }
 
 interface DataManagementTableProps {
     collectionName: string;
     title: string;
+    relationConfig?: RelationConfig;
 }
 
 const formSchema = z.object({
     nom: z.string().min(1, "Le nom est requis."),
+    zones: z.array(z.string()).optional(),
+    types: z.array(z.string()).optional(),
 });
 type FormValues = z.infer<typeof formSchema>;
 
 
-export function DataManagementTable({ collectionName, title }: DataManagementTableProps) {
+export function DataManagementTable({ collectionName, title, relationConfig }: DataManagementTableProps) {
     const [items, setItems] = useState<DataItem[]>([]);
+    const [relationOptions, setRelationOptions] = useState<Option[]>([]);
     const [loading, setLoading] = useState(true);
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<DataItem | null>(null);
@@ -51,7 +62,7 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
     
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
-        defaultValues: { nom: "" },
+        defaultValues: { nom: "", zones: [], types: [] },
     });
 
     const fetchData = useCallback(async () => {
@@ -61,13 +72,19 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
             const querySnapshot = await getDocs(q);
             const dataList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as DataItem[];
             setItems(dataList);
+
+            if (relationConfig) {
+                const relQ = query(collection(db, relationConfig.collectionName), where("actif", "==", true), orderBy("nom"));
+                const relSnapshot = await getDocs(relQ);
+                setRelationOptions(relSnapshot.docs.map(doc => ({ value: doc.data().nom, label: doc.data().nom })));
+            }
         } catch (error) {
-            console.error(`Error fetching ${collectionName}: `, error);
+            console.error(`Error fetching data for ${title}: `, error);
             toast({ variant: "destructive", title: "Erreur", description: `Impossible de charger les données pour ${title}.` });
         } finally {
             setLoading(false);
         }
-    }, [collectionName, title, toast]);
+    }, [collectionName, title, toast, relationConfig]);
     
     useEffect(() => {
         fetchData();
@@ -89,9 +106,9 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
     const handleOpenSheet = (item: DataItem | null) => {
         setEditingItem(item);
         if (item) {
-            form.reset({ nom: item.nom });
+            form.reset({ nom: item.nom, zones: item.zones || [], types: item.types || [] });
         } else {
-            form.reset({ nom: "" });
+            form.reset({ nom: "", zones: [], types: [] });
         }
         setIsSheetOpen(true);
     };
@@ -107,6 +124,9 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
         }
 
         const dataToSave: Record<string, any> = { nom: trimmedName };
+        if (relationConfig) {
+            dataToSave[relationConfig.formField] = values[relationConfig.formField] || [];
+        }
 
         try {
             if (editingItem) {
@@ -229,9 +249,13 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
                 <SheetContent>
                     <SheetHeader>
                         <SheetTitle>{editingItem ? `Modifier "${editingItem.nom}"` : `Ajouter à "${title}"`}</SheetTitle>
+                        <SheetDescription>
+                            {relationConfig && `Liez cet élément à des ${relationConfig.label.toLowerCase()} pour affiner les options dans les formulaires.`}
+                        </SheetDescription>
                     </SheetHeader>
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8 mt-8">
+                        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="flex flex-col h-full">
+                           <div className="flex-1 overflow-y-auto pr-6 -mr-6 py-4 space-y-8">
                              <FormField
                                 control={form.control}
                                 name="nom"
@@ -245,11 +269,32 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
                                     </FormItem>
                                 )}
                             />
-                            
-                            <Button type="submit" disabled={form.formState.isSubmitting}>
-                                {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                Enregistrer
-                            </Button>
+
+                            {relationConfig && (
+                                <FormField
+                                    control={form.control}
+                                    name={relationConfig.formField}
+                                    render={({ field }) => (
+                                        <FormItem>
+                                            <FormLabel>{relationConfig.label} Associées</FormLabel>
+                                             <MultiSelect
+                                                options={relationOptions}
+                                                selected={field.value || []}
+                                                onChange={field.onChange}
+                                                placeholder={`Sélectionner...`}
+                                            />
+                                            <FormMessage />
+                                        </FormItem>
+                                    )}
+                                />
+                            )}
+                            </div>
+                            <SheetFooter className="pt-4">
+                                <Button type="submit" disabled={form.formState.isSubmitting}>
+                                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                    Enregistrer
+                                </Button>
+                            </SheetFooter>
                         </form>
                     </Form>
                 </SheetContent>

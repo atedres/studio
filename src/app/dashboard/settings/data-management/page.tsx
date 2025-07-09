@@ -9,6 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArrowLeft } from "lucide-react"
 import { DataManagementTable } from "@/components/data-management-table"
 
+const typeAnomalieOptions = [
+    { value: "AD", label: "Acte Dangereux (AD)"},
+    { value: "IS", label: "Situation Dangereuse (IS)"},
+    { value: "SD", label: "Système Défaillant (SD)"},
+];
+
 export default function DataManagementPage() {
     return (
         <div className="space-y-6">
@@ -19,7 +25,7 @@ export default function DataManagementPage() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight font-headline">Gestion des Données de Base</h1>
                     <p className="text-muted-foreground">
-                        Gérez les listes utilisées dans les formulaires de l'application.
+                        Gérez les listes et leurs liaisons utilisées dans les formulaires de l'application.
                     </p>
                 </div>
             </div>
@@ -49,18 +55,33 @@ export default function DataManagementPage() {
                              <DataManagementTable
                                 collectionName="postesDeTravail"
                                 title="Postes de Travail"
+                                relationConfig={{
+                                    collectionName: "zonesDeTravail",
+                                    label: "Zones de Travail",
+                                    formField: "zones"
+                                }}
                             />
                         </TabsContent>
                         <TabsContent value="activites" className="mt-4">
                              <DataManagementTable
                                 collectionName="activitesObservees"
                                 title="Activités Observées"
+                                relationConfig={{
+                                    collectionName: "zonesDeTravail",
+                                    label: "Zones de Travail",
+                                    formField: "zones"
+                                }}
                             />
                         </TabsContent>
                         <TabsContent value="risques" className="mt-4">
                              <DataManagementTable
                                 collectionName="famillesDeRisque"
                                 title="Familles de Risque"
+                                relationConfig={{
+                                    collectionName: "typesAnomalie", // This is a virtual collection based on the static options
+                                    label: "Types d'Anomalie",
+                                    formField: "types"
+                                }}
                             />
                         </TabsContent>
                     </Tabs>
