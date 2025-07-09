@@ -26,7 +26,7 @@ import {
   Cell
 } from "recharts"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, doc, getDoc, updateDoc } from "firebase/firestore"
+import { collection, getDocs, doc, getDoc, updateDoc, Timestamp } from "firebase/firestore"
 import { subMonths, format, startOfMonth } from 'date-fns';
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from "@/hooks/use-toast"
@@ -97,150 +97,194 @@ const CHART_COLORS = [
   'hsl(var(--chart-5))',
 ];
 
+const demoData: DashboardData = {
+    actionsEnRetard: 8,
+    auditsRealises: { total: 142, ceMois: 12 },
+    totalAnomalies: 219,
+    incidentsRecents: [
+        { id: 'demo1', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, zone: 'Laminoir', status: 'Ouverte', anomalies: [] },
+        { id: 'demo2', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, zone: 'Aciérie', status: 'Clôturée', anomalies: [] },
+        { id: 'demo3', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, zone: 'Logistique', status: 'Ouverte', anomalies: [] }
+    ],
+    anomaliesParType: [
+        { name: 'Chute de plain-pied', value: 40, fill: CHART_COLORS[0] },
+        { name: 'Manutention manuelle', value: 30, fill: CHART_COLORS[1] },
+        { name: 'Risque électrique', value: 20, fill: CHART_COLORS[2] },
+        { name: 'Travaux en hauteur', value: 27, fill: CHART_COLORS[3] },
+        { name: 'Bruit', value: 15, fill: CHART_COLORS[4] },
+    ],
+    activiteParMois: [
+        { name: format(subMonths(new Date(), 5), 'MMM'), Dialogues: 30, CAA: 15 },
+        { name: format(subMonths(new Date(), 4), 'MMM'), Dialogues: 25, CAA: 20 },
+        { name: format(subMonths(new Date(), 3), 'MMM'), Dialogues: 35, CAA: 18 },
+        { name: format(subMonths(new Date(), 2), 'MMM'), Dialogues: 40, CAA: 22 },
+        { name: format(subMonths(new Date(), 1), 'MMM'), Dialogues: 33, CAA: 19 },
+        { name: format(new Date(), 'MMM'), Dialogues: 12, CAA: 5 },
+    ]
+};
+
+const demoTasks: Task[] = [
+    { taskId: 'demo-task-1', docId: '1', docType: 'audit', docSource: 'DS démo', status: 'En cours', description: 'Vérifier extincteur zone X', responsable: 'Utilisateur de démo' },
+    { taskId: 'demo-task-2', docId: '2', docType: 'anomaly', docSource: 'CAA démo', status: 'En cours', description: 'Nettoyer déversement huile', responsable: 'Utilisateur de démo' },
+    { taskId: 'demo-task-3', docId: '3', docType: 'audit', docSource: 'DS démo', status: 'Non réalisée', description: 'Remplacer garde de sécurité', responsable: 'Utilisateur de démo' },
+];
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const { user } = useAuth();
+  const { user, isDemoMode } = useAuth();
   const [myTasks, setMyTasks] = useState<Task[]>([]);
   const { toast } = useToast();
   const [updatingTasks, setUpdatingTasks] = useState<string[]>([]);
-
-  const fetchData = async () => {
-      if (!user) { // Don't fetch if user is not loaded
-          setLoading(false);
-          return;
-      }
-      setLoading(true);
-      try {
-        const dialoguesSnapshot = await getDocs(collection(db, "dialoguesSecurite"));
-        const caasSnapshot = await getDocs(collection(db, "chassesAuxAnomalies"));
-
-        const dialogues = dialoguesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as DialogueSecurite[];
-        const caas = caasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ChasseAuxAnomalies[];
-
-        // 1. Actions en retard
-        const now = new Date();
-        let actionsEnRetard = 0;
-        const allAnomaliesFromDS = dialogues.flatMap(d => d.anomalies);
-        const allAnomaliesFromCAA = caas.flatMap(c => c.anomalies);
-        const allAnomalies = [...allAnomaliesFromDS, ...allAnomaliesFromCAA];
-        
-        allAnomalies.forEach(anomaly => {
-          const status = anomaly.statut || anomaly.avancement;
-          if (anomaly.echeance && new Date(anomaly.echeance.seconds * 1000) < now && status !== "Réalisée") {
-            actionsEnRetard++;
-          }
-        });
-        
-        // 2. Audits réalisés
-        const ceMoisStart = startOfMonth(now);
-        const auditsCeMois = dialogues.filter(d => new Date(d.date.seconds * 1000) >= ceMoisStart).length;
-        const auditsRealises = {
-          total: dialogues.length,
-          ceMois: auditsCeMois,
-        };
-
-        // 3. Incidents récents (using recent CAAs)
-        const incidentsRecents = caas
-          .sort((a, b) => b.date.seconds - a.date.seconds)
-          .slice(0, 3);
-
-        // 4. Anomalies par type (famille de risque)
-        const anomaliesByTypeMap = new Map<string, number>();
-        allAnomalies.forEach(anomaly => {
-          const famille = anomaly.famille || anomaly.familleRisque || 'Non défini';
-          anomaliesByTypeMap.set(famille, (anomaliesByTypeMap.get(famille) || 0) + 1);
-        });
-        const anomaliesParType = Array.from(anomaliesByTypeMap.entries()).map(([name, value], index) => ({
-          name,
-          value,
-          fill: CHART_COLORS[index % CHART_COLORS.length],
-        }));
-
-        // 5. Activité par mois (last 6 months)
-        const activiteParMoisMap = new Map<string, { Dialogues: number; CAA: number }>();
-        for (let i = 5; i >= 0; i--) {
-            const date = subMonths(now, i);
-            const monthName = format(date, 'MMM');
-            activiteParMoisMap.set(monthName, { Dialogues: 0, CAA: 0 });
-        }
-
-        dialogues.forEach(d => {
-            const monthName = format(new Date(d.date.seconds * 1000), 'MMM');
-            if (activiteParMoisMap.has(monthName)) {
-                activiteParMoisMap.get(monthName)!.Dialogues++;
-            }
-        });
-        caas.forEach(c => {
-            const monthName = format(new Date(c.date.seconds * 1000), 'MMM');
-            if (activiteParMoisMap.has(monthName)) {
-                activiteParMoisMap.get(monthName)!.CAA++;
-            }
-        });
-
-        const activiteParMois = Array.from(activiteParMoisMap.entries()).map(([name, values]) => ({
-            name,
-            ...values
-        }));
-
-        // 6. User tasks
-        const userDialoguesTasks: Task[] = dialogues.flatMap(d => 
-            d.anomalies
-             .map((a, i) => ({
-                ...a,
-                taskId: `${d.id}-${i}`,
-                docId: d.id,
-                docType: 'audit' as const,
-                docSource: `DS ${d.id.substring(0,4)}...`,
-                status: a.statut || 'Non défini'
-             }))
-             .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.status !== 'Réalisée')
-        );
-
-        const userCaasTasks: Task[] = caas.flatMap(c => 
-            c.anomalies
-             .map((a, i) => ({
-                ...a,
-                taskId: `${c.id}-${i}`,
-                docId: c.id,
-                docType: 'anomaly' as const,
-                docSource: `CAA ${c.id.substring(0,4)}...`,
-                status: a.avancement || 'Non défini'
-             }))
-             .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.status !== 'Réalisée')
-        );
-        
-        setMyTasks([...userDialoguesTasks, ...userCaasTasks]);
-
-        setData({
-          actionsEnRetard,
-          auditsRealises,
-          totalAnomalies: allAnomalies.length,
-          incidentsRecents,
-          anomaliesParType,
-          activiteParMois
-        });
-
-      } catch (error) {
-        console.error("Error fetching dashboard data:", error);
-         toast({
-          variant: "destructive",
-          title: "Erreur de chargement",
-          description: "Impossible de récupérer les données du tableau de bord.",
-        })
-      } finally {
-        setLoading(false);
-      }
-    };
   
   useEffect(() => {
+    if (isDemoMode) {
+      setData(demoData);
+      setMyTasks(demoTasks);
+      setLoading(false);
+      return;
+    }
+
+    const fetchData = async () => {
+        if (!user) { // Don't fetch if user is not loaded
+            setLoading(false);
+            return;
+        }
+        setLoading(true);
+        try {
+          const dialoguesSnapshot = await getDocs(collection(db, "dialoguesSecurite"));
+          const caasSnapshot = await getDocs(collection(db, "chassesAuxAnomalies"));
+  
+          const dialogues = dialoguesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as DialogueSecurite[];
+          const caas = caasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ChasseAuxAnomalies[];
+  
+          // 1. Actions en retard
+          const now = new Date();
+          let actionsEnRetard = 0;
+          const allAnomaliesFromDS = dialogues.flatMap(d => d.anomalies);
+          const allAnomaliesFromCAA = caas.flatMap(c => c.anomalies);
+          const allAnomalies = [...allAnomaliesFromDS, ...allAnomaliesFromCAA];
+          
+          allAnomalies.forEach(anomaly => {
+            const status = anomaly.statut || anomaly.avancement;
+            if (anomaly.echeance && new Date(anomaly.echeance.seconds * 1000) < now && status !== "Réalisée") {
+              actionsEnRetard++;
+            }
+          });
+          
+          // 2. Audits réalisés
+          const ceMoisStart = startOfMonth(now);
+          const auditsCeMois = dialogues.filter(d => new Date(d.date.seconds * 1000) >= ceMoisStart).length;
+          const auditsRealises = {
+            total: dialogues.length,
+            ceMois: auditsCeMois,
+          };
+  
+          // 3. Incidents récents (using recent CAAs)
+          const incidentsRecents = caas
+            .sort((a, b) => b.date.seconds - a.date.seconds)
+            .slice(0, 3);
+  
+          // 4. Anomalies par type (famille de risque)
+          const anomaliesByTypeMap = new Map<string, number>();
+          allAnomalies.forEach(anomaly => {
+            const famille = anomaly.famille || anomaly.familleRisque || 'Non défini';
+            anomaliesByTypeMap.set(famille, (anomaliesByTypeMap.get(famille) || 0) + 1);
+          });
+          const anomaliesParType = Array.from(anomaliesByTypeMap.entries()).map(([name, value], index) => ({
+            name,
+            value,
+            fill: CHART_COLORS[index % CHART_COLORS.length],
+          }));
+  
+          // 5. Activité par mois (last 6 months)
+          const activiteParMoisMap = new Map<string, { Dialogues: number; CAA: number }>();
+          for (let i = 5; i >= 0; i--) {
+              const date = subMonths(now, i);
+              const monthName = format(date, 'MMM');
+              activiteParMoisMap.set(monthName, { Dialogues: 0, CAA: 0 });
+          }
+  
+          dialogues.forEach(d => {
+              const monthName = format(new Date(d.date.seconds * 1000), 'MMM');
+              if (activiteParMoisMap.has(monthName)) {
+                  activiteParMoisMap.get(monthName)!.Dialogues++;
+              }
+          });
+          caas.forEach(c => {
+              const monthName = format(new Date(c.date.seconds * 1000), 'MMM');
+              if (activiteParMoisMap.has(monthName)) {
+                  activiteParMoisMap.get(monthName)!.CAA++;
+              }
+          });
+  
+          const activiteParMois = Array.from(activiteParMoisMap.entries()).map(([name, values]) => ({
+              name,
+              ...values
+          }));
+  
+          // 6. User tasks
+          const userDialoguesTasks: Task[] = dialogues.flatMap(d => 
+              d.anomalies
+               .map((a, i) => ({
+                  ...a,
+                  taskId: `${d.id}-${i}`,
+                  docId: d.id,
+                  docType: 'audit' as const,
+                  docSource: `DS ${d.id.substring(0,4)}...`,
+                  status: a.statut || 'Non défini'
+               }))
+               .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.status !== 'Réalisée')
+          );
+  
+          const userCaasTasks: Task[] = caas.flatMap(c => 
+              c.anomalies
+               .map((a, i) => ({
+                  ...a,
+                  taskId: `${c.id}-${i}`,
+                  docId: c.id,
+                  docType: 'anomaly' as const,
+                  docSource: `CAA ${c.id.substring(0,4)}...`,
+                  status: a.avancement || 'Non défini'
+               }))
+               .filter(a => a.responsable?.toLowerCase() === user.email?.toLowerCase() && a.status !== 'Réalisée')
+          );
+          
+          setMyTasks([...userDialoguesTasks, ...userCaasTasks]);
+  
+          setData({
+            actionsEnRetard,
+            auditsRealises,
+            totalAnomalies: allAnomalies.length,
+            incidentsRecents,
+            anomaliesParType,
+            activiteParMois
+          });
+  
+        } catch (error) {
+          console.error("Error fetching dashboard data:", error);
+           toast({
+            variant: "destructive",
+            title: "Erreur de chargement",
+            description: "Impossible de récupérer les données du tableau de bord.",
+          })
+        } finally {
+          setLoading(false);
+        }
+    };
+  
     if (user) {
       fetchData();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
+  }, [user, isDemoMode]);
 
   const handleTaskStatusChange = async (task: Task, newStatus: string) => {
+    if (isDemoMode) {
+      toast({ title: 'Mode Démo', description: 'Les actions sont désactivées en mode démo.' });
+      return;
+    }
+
     setUpdatingTasks(prev => [...prev, task.taskId]);
     const collectionName = task.docType === 'audit' ? 'dialoguesSecurite' : 'chassesAuxAnomalies';
     const docRef = doc(db, collectionName, task.docId);
@@ -428,8 +472,8 @@ export default function DashboardPage() {
                                 </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                                <Button asChild variant="outline" size="icon">
-                                    <Link href={`/dashboard/anomalies/${incident.id}`}>
+                                <Button asChild variant="outline" size="icon" disabled={isDemoMode}>
+                                    <Link href={isDemoMode ? '#' : `/dashboard/anomalies/${incident.id}`}>
                                         <Eye className="h-4 w-4" />
                                         <span className="sr-only">Voir</span>
                                     </Link>
@@ -473,7 +517,7 @@ export default function DashboardPage() {
                                 </div>
                             ) : (
                                 <>
-                                    <Link href={task.docType === 'audit' ? `/dashboard/audits/${task.docId}` : `/dashboard/anomalies/${task.docId}`} className="flex-1 cursor-pointer group">
+                                    <Link href={isDemoMode ? '#' : (task.docType === 'audit' ? `/dashboard/audits/${task.docId}` : `/dashboard/anomalies/${task.docId}`)} className="flex-1 cursor-pointer group">
                                         <p className="text-sm font-normal group-hover:underline">
                                             {task.description}
                                             <span className="ml-2 text-xs text-muted-foreground">({task.docSource})</span>
@@ -482,6 +526,7 @@ export default function DashboardPage() {
                                     <Select
                                         value={task.status}
                                         onValueChange={(newStatus) => handleTaskStatusChange(task, newStatus)}
+                                        disabled={isDemoMode}
                                     >
                                         <SelectTrigger className="w-[140px] h-8 text-xs">
                                             <SelectValue placeholder="Changer statut" />

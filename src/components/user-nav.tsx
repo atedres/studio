@@ -18,9 +18,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { MonitorPlay } from "lucide-react"
 
 export function UserNav() {
-  const { user, signOut } = useAuth()
+  const { user, signOut, isDemoMode, toggleDemoMode } = useAuth()
+  const canSeeDemo = user && ['niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role)
 
   if (!user) {
     return null
@@ -59,6 +61,12 @@ export function UserNav() {
               Profil & Paramètres
             </DropdownMenuItem>
           </Link>
+          {canSeeDemo && (
+             <DropdownMenuItem onClick={toggleDemoMode}>
+                <MonitorPlay className="mr-2 h-4 w-4" />
+                <span>{isDemoMode ? "Quitter le mode Démo" : "Activer le mode Démo"}</span>
+            </DropdownMenuItem>
+          )}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={signOut}>

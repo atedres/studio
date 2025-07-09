@@ -24,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { FilePlus2, TrendingUp, UserCheck, Eye } from "lucide-react"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, orderBy, where } from "firebase/firestore"
+import { collection, getDocs, query, orderBy, where, Timestamp } from "firebase/firestore"
 import { startOfMonth, subMonths, format, getMonth, getYear } from 'date-fns';
 import { useAuth } from "@/hooks/use-auth"
 
@@ -52,13 +52,42 @@ interface AnomalyStats {
     anomaliesParMois: { name: string; "Anomalies": number }[];
 }
 
+const demoCAAs: CAA[] = [
+    { id: 'demo1', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, zone: 'Laminoir', animateur: 'Y. Alaoui', anomalies: [{avancement: 'En cours'}, {avancement: 'Réalisée'}], status: 'Ouverte' },
+    { id: 'demo2', date: { seconds: Timestamp.from(subMonths(new Date(), 1)).seconds, nanoseconds: 0 }, zone: 'Aciérie', animateur: 'F. Ziani', anomalies: [{avancement: 'Réalisée'}], status: 'Clôturée' },
+    { id: 'demo3', date: { seconds: Timestamp.from(subMonths(new Date(), 2)).seconds, nanoseconds: 0 }, zone: 'Logistique', animateur: 'Y. Alaoui', anomalies: [{avancement: 'En cours'}, {avancement: 'En cours'}], status: 'Ouverte' },
+    { id: 'demo4', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, zone: 'Laminoir', animateur: 'A. Saidi', anomalies: [], status: 'Brouillon' },
+];
+
+const demoStats: AnomalyStats = {
+    anomaliesCeMois: 5,
+    tauxResolution: 68,
+    anomaliesOuvertes: 12,
+    topAnimateur: { name: 'Y. Alaoui', count: 15 },
+    anomaliesParMois: [
+        { name: format(subMonths(new Date(), 5), 'MMM'), "Anomalies": 22 },
+        { name: format(subMonths(new Date(), 4), 'MMM'), "Anomalies": 18 },
+        { name: format(subMonths(new Date(), 3), 'MMM'), "Anomalies": 25 },
+        { name: format(subMonths(new Date(), 2), 'MMM'), "Anomalies": 30 },
+        { name: format(subMonths(new Date(), 1), 'MMM'), "Anomalies": 21 },
+        { name: format(new Date(), 'MMM'), "Anomalies": 5 },
+    ]
+};
+
 export default function AnomaliesPage() {
     const [caas, setCaas] = useState<CAA[]>([])
     const [stats, setStats] = useState<AnomalyStats | null>(null)
     const [loading, setLoading] = useState(true)
-    const { user } = useAuth()
+    const { user, isDemoMode } = useAuth()
 
     useEffect(() => {
+        if (isDemoMode) {
+            setCaas(demoCAAs);
+            setStats(demoStats);
+            setLoading(false);
+            return;
+        }
+
         const calculateStats = (data: CAA[]) => {
             const now = new Date();
             const debutMois = startOfMonth(now);
@@ -158,7 +187,7 @@ export default function AnomaliesPage() {
         };
 
         fetchCAAs();
-    }, [user]);
+    }, [user, isDemoMode]);
 
 
     const getStatusVariant = (status: string) => {
@@ -189,6 +218,11 @@ export default function AnomaliesPage() {
       </TableRow>
     ))
   )
+
+  const getLinkHref = (caa: CAA) => {
+    if (isDemoMode) return '#';
+    return caa.status === 'Brouillon' ? `/dashboard/anomalies/${caa.id}/edit` : `/dashboard/anomalies/${caa.id}`;
+  }
 
   return (
     <div className="space-y-6">
@@ -271,8 +305,8 @@ export default function AnomaliesPage() {
                             <TableCell className="text-center">{caa.anomalies.length}</TableCell>
                             <TableCell><Badge variant={getStatusVariant(caa.status) as any}>{caa.status}</Badge></TableCell>
                              <TableCell className="text-right">
-                                <Button asChild variant="outline" size="icon">
-                                    <Link href={caa.status === 'Brouillon' ? `/dashboard/anomalies/${caa.id}/edit` : `/dashboard/anomalies/${caa.id}`}>
+                                <Button asChild variant="outline" size="icon" disabled={isDemoMode}>
+                                    <Link href={getLinkHref(caa)}>
                                         <Eye className="h-4 w-4" />
                                         <span className="sr-only">{caa.status === 'Brouillon' ? 'Modifier' : 'Voir'}</span>
                                     </Link>
@@ -304,8 +338,8 @@ export default function AnomaliesPage() {
         </Card>
       </div>
         <div className="fixed bottom-8 right-8">
-            <Button asChild size="lg" className="rounded-full h-16 w-16 shadow-lg bg-accent hover:bg-accent/90">
-                <Link href="/dashboard/anomalies/new">
+            <Button asChild size="lg" className="rounded-full h-16 w-16 shadow-lg bg-accent hover:bg-accent/90" disabled={isDemoMode}>
+                <Link href={isDemoMode ? "#" : "/dashboard/anomalies/new"}>
                     <FilePlus2 className="h-8 w-8" />
                     <span className="sr-only">Ajouter une CAA</span>
                 </Link>

@@ -24,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Eye, ListFilter } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, query, where, Timestamp } from "firebase/firestore"
-import { format, isPast } from 'date-fns'
+import { format, isPast, subDays } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import {
   DropdownMenu,
@@ -39,6 +39,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useAuth } from "@/hooks/use-auth"
 
 interface Action {
     id: string; // combination of docId and index
@@ -51,7 +52,15 @@ interface Action {
     isOverdue: boolean;
 }
 
+const demoActions: Action[] = [
+    { id: 'demo-1', description: "Installer une nouvelle signalisation de sécurité", source: 'CAA', sourceId: 'demo-caa-1', responsable: 'J. Dupont', echeance: Timestamp.fromDate(subDays(new Date(), 5)), status: 'En cours', isOverdue: true },
+    { id: 'demo-2', description: "Vérifier le harnais de sécurité", source: 'DS', sourceId: 'demo-ds-1', responsable: 'A. Martin', echeance: Timestamp.fromDate(new Date()), status: 'En cours', isOverdue: false },
+    { id: 'demo-3', description: "Réparer une fuite d'huile mineure", source: 'CAA', sourceId: 'demo-caa-2', responsable: 'F. Bernard', echeance: Timestamp.fromDate(subDays(new Date(), 10)), status: 'Non réalisée', isOverdue: true },
+    { id: 'demo-4', description: "Former l'équipe sur la nouvelle procédure LOTO", source: 'DS', sourceId: 'demo-ds-2', responsable: 'C. Petit', echeance: undefined, status: 'En cours', isOverdue: false },
+];
+
 export default function ActionPlanPage() {
+    const { isDemoMode } = useAuth();
     const [actions, setActions] = useState<Action[]>([])
     const [filteredActions, setFilteredActions] = useState<Action[]>([])
     const [loading, setLoading] = useState(true)
@@ -62,6 +71,12 @@ export default function ActionPlanPage() {
     });
 
     useEffect(() => {
+        if (isDemoMode) {
+            setActions(demoActions);
+            setLoading(false);
+            return;
+        }
+
         const fetchActions = async () => {
             setLoading(true);
             const allActions: Action[] = [];
@@ -132,7 +147,7 @@ export default function ActionPlanPage() {
         };
 
         fetchActions();
-    }, []);
+    }, [isDemoMode]);
 
     useEffect(() => {
         const tempActions = actions.filter(action => {
@@ -172,6 +187,11 @@ export default function ActionPlanPage() {
             return "Aucune action ouverte. Excellent travail !";
         }
         return "Aucune action ne correspond à vos critères de filtre.";
+    }
+
+    const getLinkHref = (action: Action) => {
+        if (isDemoMode) return "#";
+        return action.source === 'CAA' ? `/dashboard/anomalies/${action.sourceId}` : `/dashboard/audits/${action.sourceId}`;
     }
 
     return (
@@ -255,8 +275,8 @@ export default function ActionPlanPage() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <Button asChild variant="outline" size="icon">
-                                            <Link href={action.source === 'CAA' ? `/dashboard/anomalies/${action.sourceId}` : `/dashboard/audits/${action.sourceId}`}>
+                                        <Button asChild variant="outline" size="icon" disabled={isDemoMode}>
+                                            <Link href={getLinkHref(action)}>
                                                 <Eye className="h-4 w-4" />
                                                 <span className="sr-only">Voir la source</span>
                                             </Link>

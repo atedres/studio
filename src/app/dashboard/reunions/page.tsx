@@ -24,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { PlusCircle, Eye, CalendarCheck, Users, TrendingUp } from "lucide-react"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, orderBy } from "firebase/firestore"
+import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore"
 import { startOfMonth, subMonths, format } from 'date-fns'
 import { useAuth } from "@/hooks/use-auth"
 
@@ -44,15 +44,41 @@ interface ReunionStats {
     reunionsParMois: { name: string; "Réunions": number }[];
 }
 
+const demoReunions: Reunion[] = [
+    { id: 'demo-r-1', objet: 'Revue mensuelle de la sécurité', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, heure: '10:00', animateur: 'Y. Alaoui', status: 'Planifiée' },
+    { id: 'demo-r-2', objet: 'Analyse des incidents de la semaine', date: { seconds: Timestamp.from(subMonths(new Date(), 1)).seconds, nanoseconds: 0 }, heure: '14:30', animateur: 'A. Saidi', status: 'Réalisée' },
+    { id: 'demo-r-3', objet: 'Formation aux premiers secours', date: { seconds: Timestamp.from(subMonths(new Date(), 2)).seconds, nanoseconds: 0 }, heure: '09:00', animateur: 'F. Ziani', status: 'Annulée' },
+];
+
+const demoStats: ReunionStats = {
+    reunionsCeMois: 4,
+    reunionsPlanifiees: 6,
+    topAnimateur: { name: 'Y. Alaoui', count: 8 },
+    reunionsParMois: [
+        { name: format(subMonths(new Date(), 5), 'MMM'), "Réunions": 5 },
+        { name: format(subMonths(new Date(), 4), 'MMM'), "Réunions": 7 },
+        { name: format(subMonths(new Date(), 3), 'MMM'), "Réunions": 6 },
+        { name: format(subMonths(new Date(), 2), 'MMM'), "Réunions": 8 },
+        { name: format(subMonths(new Date(), 1), 'MMM'), "Réunions": 5 },
+        { name: format(new Date(), 'MMM'), "Réunions": 4 },
+    ]
+};
+
 export default function ReunionsPage() {
   const [reunions, setReunions] = useState<Reunion[]>([])
   const [stats, setStats] = useState<ReunionStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const { user } = useAuth();
+  const { user, isDemoMode } = useAuth();
 
   const canManage = user && ['niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
 
   useEffect(() => {
+    if (isDemoMode) {
+      setReunions(demoReunions);
+      setStats(demoStats);
+      setLoading(false);
+      return;
+    }
     const fetchReunions = async () => {
         setLoading(true);
         try {
@@ -115,7 +141,7 @@ export default function ReunionsPage() {
     }
 
     fetchReunions();
-  }, []);
+  }, [isDemoMode]);
 
   const getStatusVariant = (status: string) => {
     switch (status) {
@@ -142,6 +168,11 @@ export default function ReunionsPage() {
       </TableRow>
     ))
   )
+  
+  const getLinkHref = (reunion: Reunion) => {
+    if (isDemoMode) return "#";
+    return `/dashboard/reunions/${reunion.id}`;
+  }
 
   return (
     <div className="space-y-6">
@@ -193,8 +224,8 @@ export default function ReunionsPage() {
                       <CardDescription>Liste de toutes les réunions planifiées et passées.</CardDescription>
                   </div>
                   {canManage && (
-                    <Button asChild className="bg-accent hover:bg-accent/90">
-                      <Link href="/dashboard/reunions/new">
+                    <Button asChild className="bg-accent hover:bg-accent/90" disabled={isDemoMode}>
+                      <Link href={isDemoMode ? "#" : "/dashboard/reunions/new"}>
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Programmer une réunion
                       </Link>
@@ -224,8 +255,8 @@ export default function ReunionsPage() {
                                     <Badge variant={getStatusVariant(reunion.status) as any}>{reunion.status}</Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <Button asChild variant="outline" size="icon">
-                                        <Link href={`/dashboard/reunions/${reunion.id}`}>
+                                    <Button asChild variant="outline" size="icon" disabled={isDemoMode}>
+                                        <Link href={getLinkHref(reunion)}>
                                             <Eye className="h-4 w-4" />
                                             <span className="sr-only">Voir</span>
                                         </Link>

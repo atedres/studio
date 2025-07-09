@@ -24,8 +24,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, orderBy, where, doc, updateDoc, serverTimestamp } from "firebase/firestore"
-import { startOfMonth } from 'date-fns'
+import { collection, getDocs, query, orderBy, where, doc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore"
+import { startOfMonth, subMonths } from 'date-fns'
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend } from "recharts"
 import { useAuth } from "@/hooks/use-auth"
 import { useToast } from "@/hooks/use-toast"
@@ -74,12 +74,30 @@ const ANOMALY_TYPE_MAP: { [key: string]: string } = {
     "SD": "Système Défaillant",
 };
 
+const demoDialogues: Dialogue[] = [
+    { id: 'demo-ds-1', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, observateur: 'A. Saidi', zone: 'Laminoir', anomalies: [{ type: 'AD', description: 'Non-port du casque' }], status: 'Validé' },
+    { id: 'demo-ds-2', date: { seconds: Timestamp.from(subMonths(new Date(), 1)).seconds, nanoseconds: 0 }, observateur: 'M. Tazi', zone: 'Aciérie', anomalies: [], status: 'Clôturée' },
+    { id: 'demo-ds-3', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, observateur: 'L. Bennani', zone: 'Logistique', anomalies: [{ type: 'IS', description: 'Zone de stockage encombrée' }], status: 'En attente de validation' },
+    { id: 'demo-ds-4', date: { seconds: Timestamp.now().seconds, nanoseconds: 0 }, observateur: 'S. Kettani', zone: 'Maintenance', anomalies: [{ type: 'SD', description: 'Garde de protection manquante' }], status: 'À corriger' },
+];
+
+const demoStats: DialogueStats = {
+    dialoguesCeMois: 12,
+    totalAnomalies: 28,
+    topObservateur: { name: 'A. Saidi', count: 25 },
+    anomaliesParType: [
+        { name: 'Acte Dangereux', value: 15, fill: ANOMALY_TYPE_COLORS['Acte Dangereux'] },
+        { name: 'Situation Dangereuse', value: 10, fill: ANOMALY_TYPE_COLORS['Situation Dangereuse'] },
+        { name: 'Système Défaillant', value: 3, fill: ANOMALY_TYPE_COLORS['Système Défaillant'] },
+    ]
+};
+
 
 export default function DialoguesSecuritePage() {
   const [allDialogues, setAllDialogues] = useState<Dialogue[]>([])
   const [stats, setStats] = useState<DialogueStats | null>(null)
   const [loading, setLoading] = useState(true)
-  const { user } = useAuth();
+  const { user, isDemoMode } = useAuth();
   const { toast } = useToast();
   
   const canManage = user && ['niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
@@ -100,6 +118,13 @@ export default function DialoguesSecuritePage() {
   }, [allDialogues]);
 
   useEffect(() => {
+    if (isDemoMode) {
+        setAllDialogues(demoDialogues);
+        setStats(demoStats);
+        setLoading(false);
+        return;
+    }
+
     const calculateStats = (data: Dialogue[]) => {
         const now = new Date();
         const debutMois = startOfMonth(now);
@@ -179,10 +204,10 @@ export default function DialoguesSecuritePage() {
     };
 
     fetchDialogues();
-  }, [user]);
+  }, [user, isDemoMode]);
 
   const handleValidateClick = async (dialogue: Dialogue) => {
-    if (isSubmitting) return;
+    if (isSubmitting || isDemoMode) return;
     setActiveDialogue(dialogue);
     setIsSubmitting(true);
     const docRef = doc(db, "dialoguesSecurite", dialogue.id);
@@ -205,17 +230,19 @@ export default function DialoguesSecuritePage() {
   };
 
   const handleCorrectionClick = (dialogue: Dialogue) => {
+      if (isDemoMode) return;
       setActiveDialogue(dialogue);
       setIsCorrectionDialogOpen(true);
   };
   
   const handleRejectClick = (dialogue: Dialogue) => {
+      if (isDemoMode) return;
       setActiveDialogue(dialogue);
       setIsRejectDialogOpen(true);
   };
 
   const handleDialogSubmit = async (action: 'reject' | 'requestCorrection') => {
-      if (!user || !activeDialogue) return;
+      if (!user || !activeDialogue || isDemoMode) return;
       setIsSubmitting(true);
       const docRef = doc(db, "dialoguesSecurite", activeDialogue.id);
       
@@ -306,6 +333,12 @@ export default function DialoguesSecuritePage() {
       </TableRow>
     ))
   )
+  
+  const getLinkHref = (dialogue: Dialogue) => {
+    if (isDemoMode) return "#";
+    return dialogue.status === 'Brouillon' || dialogue.status === 'À corriger' ? `/dashboard/audits/${dialogue.id}/edit` : `/dashboard/audits/${dialogue.id}`;
+  }
+
 
   const renderTable = (data: Dialogue[], emptyMessage: string, isPendingTab = false) => (
     <Table>
@@ -358,7 +391,7 @@ export default function DialoguesSecuritePage() {
                 {dialogue.status === 'En attente de validation' && canManage ? (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0" disabled={isSubmitting && activeDialogue?.id === dialogue.id}>
+                            <Button variant="ghost" className="h-8 w-8 p-0" disabled={(isSubmitting && activeDialogue?.id === dialogue.id) || isDemoMode}>
                                 <span className="sr-only">Ouvrir le menu</span>
                                 {isSubmitting && activeDialogue?.id === dialogue.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <MoreHorizontal className="h-4 w-4" />}
                             </Button>
@@ -383,8 +416,8 @@ export default function DialoguesSecuritePage() {
                         </DropdownMenuContent>
                     </DropdownMenu>
                 ) : (
-                    <Button asChild variant="outline" size="sm">
-                        <Link href={dialogue.status === 'Brouillon' || dialogue.status === 'À corriger' ? `/dashboard/audits/${dialogue.id}/edit` : `/dashboard/audits/${dialogue.id}`}>
+                    <Button asChild variant="outline" size="sm" disabled={isDemoMode}>
+                        <Link href={getLinkHref(dialogue)}>
                             <Eye className="mr-2 h-4 w-4" /> {dialogue.status === 'Brouillon' || dialogue.status === 'À corriger' ? 'Modifier' : 'Voir'}
                         </Link>
                     </Button>
@@ -513,8 +546,8 @@ export default function DialoguesSecuritePage() {
       </div>
 
        <div className="fixed bottom-8 right-8">
-            <Button asChild size="lg" className="rounded-full h-16 w-16 shadow-lg bg-accent hover:bg-accent/90">
-                <Link href="/dashboard/audits/new">
+            <Button asChild size="lg" className="rounded-full h-16 w-16 shadow-lg bg-accent hover:bg-accent/90" disabled={isDemoMode}>
+                <Link href={isDemoMode ? "#" : "/dashboard/audits/new"}>
                     <FilePlus2 className="h-8 w-8" />
                     <span className="sr-only">Ajouter un DS</span>
                 </Link>
@@ -568,5 +601,3 @@ export default function DialoguesSecuritePage() {
     </TooltipProvider>
   )
 }
-
-    

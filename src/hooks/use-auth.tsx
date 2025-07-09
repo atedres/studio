@@ -1,7 +1,7 @@
 
 "use client"
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import {
   User as FirebaseUser,
   onAuthStateChanged,
@@ -30,6 +30,8 @@ export type AppUser = {
 interface AuthContextType {
   user: AppUser | null;
   loading: boolean;
+  isDemoMode: boolean;
+  toggleDemoMode: () => void;
   signIn: typeof signInWithEmailAndPassword;
   signOut: () => Promise<void>;
   updateUserProfile?: (data: { displayName: string; firstName: string; lastName: string }) => Promise<void>;
@@ -87,7 +89,12 @@ const seedInitialData = async () => {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const router = useRouter();
+
+  const toggleDemoMode = useCallback(() => {
+    setIsDemoMode(prev => !prev);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
@@ -203,6 +210,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signOut = async () => {
+    setIsDemoMode(false); // Ensure demo mode is off on sign out
     await firebaseSignOut(auth);
     router.push('/');
   };
@@ -210,6 +218,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const value = {
     user,
     loading,
+    isDemoMode,
+    toggleDemoMode,
     signIn: (email, password) => signInWithEmailAndPassword(auth, email, password),
     signOut,
     updateUserProfile,
