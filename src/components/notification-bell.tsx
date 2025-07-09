@@ -11,6 +11,7 @@ import { db } from '@/lib/firebase'
 import { collection, query, where, getDocs, Timestamp, orderBy } from 'firebase/firestore'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { cn } from "@/lib/utils"
 
 interface Notification {
     id: string;
@@ -19,12 +20,30 @@ interface Notification {
     timestamp: Timestamp;
 }
 
+const READ_NOTIFICATIONS_KEY = "hse_read_notifications";
+
 export function NotificationBell() {
     const { user } = useAuth()
     const [notifications, setNotifications] = useState<Notification[]>([])
     const [loading, setLoading] = useState(true)
     const [isOpen, setIsOpen] = useState(false)
+    const [readNotifications, setReadNotifications] = useState<Set<string>>(new Set());
+
     const canManage = user && ['niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role)
+
+    // Load read notifications from localStorage on mount
+    useEffect(() => {
+        try {
+            const storedReadIds = localStorage.getItem(READ_NOTIFICATIONS_KEY);
+            if (storedReadIds) {
+                setReadNotifications(new Set(JSON.parse(storedReadIds)));
+            }
+        } catch (error) {
+            console.error("Failed to parse read notifications from localStorage", error);
+            // In case of parsing error, clear the faulty key
+            localStorage.removeItem(READ_NOTIFICATIONS_KEY);
+        }
+    }, []);
 
     useEffect(() => {
         if (!user) {
@@ -133,16 +152,24 @@ export function NotificationBell() {
         fetchNotifications();
     }, [user, canManage])
 
-    const notificationCount = notifications.length;
+    const handleNotificationClick = (notificationId: string) => {
+        const newReadNotifications = new Set(readNotifications);
+        newReadNotifications.add(notificationId);
+        setReadNotifications(newReadNotifications);
+        localStorage.setItem(READ_NOTIFICATIONS_KEY, JSON.stringify(Array.from(newReadNotifications)));
+        setIsOpen(false);
+    };
+
+    const unreadCount = notifications.filter(n => !readNotifications.has(n.id)).length;
 
     return (
         <Popover open={isOpen} onOpenChange={setIsOpen}>
             <PopoverTrigger asChild>
                 <Button variant="outline" size="icon" className="relative">
                     <Bell className="h-[1.2rem] w-[1.2rem]" />
-                    {!loading && notificationCount > 0 && (
+                    {!loading && unreadCount > 0 && (
                          <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center">
-                            {notificationCount > 9 ? '9+' : notificationCount}
+                            {unreadCount > 9 ? '9+' : unreadCount}
                          </div>
                     )}
                     <span className="sr-only">Ouvrir les notifications</span>
@@ -157,10 +184,18 @@ export function NotificationBell() {
                          <div className="flex items-center justify-center p-4">
                             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                          </div>
-                    ) : notificationCount > 0 ? (
+                    ) : notifications.length > 0 ? (
                         <div className="flex flex-col">
                             {notifications.map(notif => (
-                                <Link key={notif.id} href={notif.href} onClick={() => setIsOpen(false)} className="block hover:bg-secondary rounded-md p-2 border-b last:border-b-0">
+                                <Link
+                                    key={notif.id}
+                                    href={notif.href}
+                                    onClick={() => handleNotificationClick(notif.id)}
+                                    className={cn(
+                                        "block hover:bg-secondary rounded-md p-2 border-b last:border-b-0 transition-colors",
+                                        !readNotifications.has(notif.id) && "bg-accent/10"
+                                    )}
+                                >
                                      <p className="text-sm font-medium">{notif.message}</p>
                                      <p className="text-xs text-muted-foreground">{formatDistanceToNow(notif.timestamp.toDate(), { addSuffix: true, locale: fr })}</p>
                                 </Link>
