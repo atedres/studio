@@ -21,6 +21,7 @@ import React, { useEffect } from 'react'
 
 import { AuthProvider, useAuth } from '@/hooks/use-auth'
 import { LanguageSwitcher } from "@/components/language-switcher"
+import { NotificationBell } from "@/components/notification-bell"
 import {
   Sidebar,
   SidebarContent,
@@ -116,6 +117,7 @@ function ProtectedDashboardLayout({
             <div className="w-full flex-1">
               {/* Optional: Add breadcrumbs or page title here */}
             </div>
+            <NotificationBell />
             <ThemeSwitcher />
             <LanguageSwitcher />
             <UserNav />
