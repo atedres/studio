@@ -5,7 +5,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useFieldArray, useForm } from "react-hook-form"
+import { useFieldArray, useForm, useFormContext } from "react-hook-form"
 import * as z from "zod"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -20,11 +20,12 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2 } from "lucide-react"
+import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, Wand2, Check, RefreshCcw, Undo2 } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { doc, getDoc, updateDoc, Timestamp, collection, getDocs, query, where } from "firebase/firestore"
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
 import { logActivity } from '@/lib/activityLogger'
+import { rewriteDescription } from '@/ai/flows/description-rewriter-flow'
 
 const dialogueSecuriteSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -39,7 +40,7 @@ const dialogueSecuriteSchema = z.object({
     type: z.enum(["AD", "IS", "SD"], { required_error: "Le type est requis." }),
     description: z.string().min(1, "La description est requise."),
     familleRisque: z.string().min(1, "La famille de risque est requise."),
-    actionsImmediates: z.string().optional(),
+    actionsImmediates: z.array(z.object({ value: z.string().min(1, "L'action immédiate ne peut être vide.") })).optional(),
     actionsCorrectives: z.string().optional(),
     echeance: z.date().optional(),
     garant: z.string().optional(),
@@ -50,6 +51,58 @@ const dialogueSecuriteSchema = z.object({
 })
 
 type DialogueSecuriteFormValues = z.infer<typeof dialogueSecuriteSchema>
+
+const bonnesPratiques = [
+    "Port des EPI conforme",
+    "Utilisation correcte des outils",
+    "Respect des procédures de consignation (LOTO)",
+    "Maintien de l'ordre et de la propreté (5S)",
+    "Posture de travail adéquate",
+    "Autre",
+];
+
+const ActionsImmediatesArray = ({ nestIndex, control }: { nestIndex: number; control: any }) => {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `anomalies.${nestIndex}.actionsImmediates`,
+  });
+
+  return (
+    <div className="space-y-3 pl-4 border-l-2 ml-2 py-2">
+        <FormLabel>Actions immédiates</FormLabel>
+        {fields.map((item, k) => (
+            <FormField
+            key={item.id}
+            control={control}
+            name={`anomalies.${nestIndex}.actionsImmediates.${k}.value`}
+            render={({ field }) => (
+                <FormItem>
+                <div className="flex items-center gap-2">
+                    <FormControl>
+                    <Textarea placeholder={`Action immédiate n°${k + 1}`} {...field} rows={1} />
+                    </FormControl>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(k)}>
+                    <Trash2 className="h-4 w-4" />
+                    </Button>
+                </div>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+        ))}
+        <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => append({ value: "" })}
+        >
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Ajouter une action
+        </Button>
+    </div>
+  );
+};
+
 
 export default function EditDialogueSecuritePage() {
     const { toast } = useToast()
@@ -63,7 +116,6 @@ export default function EditDialogueSecuritePage() {
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
     const [openEcheancePopovers, setOpenEcheancePopovers] = useState<Record<number, boolean>>({})
 
-
     const [zones, setZones] = useState<string[]>([]);
     const [postes, setPostes] = useState<string[]>([]);
     const [activites, setActivites] = useState<string[]>([]);
@@ -72,6 +124,10 @@ export default function EditDialogueSecuritePage() {
 
     const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
     const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
+    
+    const [customBP, setCustomBP] = useState<Record<number, boolean>>({});
+    const [aiRewriteStates, setAiRewriteStates] = useState<Record<number, { isRewriting: boolean; originalText: string; suggestion: string }>>({});
+
 
     const form = useForm<DialogueSecuriteFormValues>({
         resolver: zodResolver(dialogueSecuriteSchema),
@@ -128,12 +184,25 @@ export default function EditDialogueSecuritePage() {
 
             if (docSnap.exists()) {
                 const data = docSnap.data();
+                
+                // Initialize customBP state based on loaded data
+                const initialCustomBP: Record<number, boolean> = {};
+                if (data.comportementsPositifs && Array.isArray(data.comportementsPositifs)) {
+                    data.comportementsPositifs.forEach((comp: { value: string }, index: number) => {
+                        if (!bonnesPratiques.includes(comp.value)) {
+                            initialCustomBP[index] = true;
+                        }
+                    });
+                }
+                setCustomBP(initialCustomBP);
+
                 const transformedData = {
                     ...data,
                     date: (data.date as Timestamp).toDate(),
                     anomalies: data.anomalies.map((anomalie: any) => ({
                         ...anomalie,
                         echeance: anomalie.echeance ? (anomalie.echeance as Timestamp).toDate() : undefined,
+                        actionsImmediates: anomalie.actionsImmediates || [],
                     })),
                 };
                 form.reset(transformedData as DialogueSecuriteFormValues);
@@ -160,6 +229,46 @@ export default function EditDialogueSecuritePage() {
         name: "anomalies",
         control: form.control,
     })
+
+    const handleRewrite = async (index: number) => {
+        const currentDescription = form.getValues(`anomalies.${index}.description`);
+        if (!currentDescription) return;
+
+        setAiRewriteStates(prev => ({
+            ...prev,
+            [index]: { ...prev[index], isRewriting: true, originalText: currentDescription, suggestion: '' }
+        }));
+
+        try {
+            const rewrittenText = await rewriteDescription(currentDescription);
+            setAiRewriteStates(prev => ({
+                ...prev,
+                [index]: { ...prev[index], isRewriting: false, suggestion: rewrittenText }
+            }));
+            form.setValue(`anomalies.${index}.description`, rewrittenText);
+        } catch (error) {
+            console.error("Rewrite error:", error);
+            toast({ variant: "destructive", title: "Erreur IA", description: "La reformulation a échoué." });
+            setAiRewriteStates(prev => ({ ...prev, [index]: { ...prev[index], isRewriting: false } }));
+        }
+    };
+
+    const acceptSuggestion = (index: number) => {
+        setAiRewriteStates(prev => {
+            const newStates = { ...prev };
+            delete newStates[index];
+            return newStates;
+        });
+    };
+
+    const revertDescription = (index: number) => {
+        const originalText = aiRewriteStates[index]?.originalText;
+        if (originalText) {
+            form.setValue(`anomalies.${index}.description`, originalText);
+        }
+        acceptSuggestion(index); // This just clears the state
+    };
+
 
     async function onSubmit(data: DialogueSecuriteFormValues) {
         setIsSubmitting(true)
@@ -287,13 +396,36 @@ export default function EditDialogueSecuritePage() {
 
                     <Card>
                         <CardHeader><CardTitle>Comportements Positifs Observés</CardTitle><CardDescription>Listez les bonnes pratiques de sécurité constatées.</CardDescription></CardHeader>
-                        <CardContent className="space-y-4">
+                         <CardContent className="space-y-4">
                             {comportementsFields.map((field, index) => (
-                                <FormField key={field.id} control={form.control} name={`comportementsPositifs.${index}.value`} render={({ field }) => (
-                                    <FormItem><div className="flex items-center gap-2"><FormControl><Input {...field} placeholder={`Bonne pratique n°${index + 1}`} /></FormControl><Button type="button" variant="ghost" size="icon" onClick={() => removeComportement(index)} disabled={comportementsFields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div><FormMessage /></FormItem>
+                                <FormField key={field.id} control={form.control} name={`comportementsPositifs.${index}.value`} render={({ field: formField }) => (
+                                    <FormItem>
+                                        <div className="flex items-center gap-2">
+                                            <Select
+                                                onValueChange={(value) => {
+                                                    if (value === 'Autre') {
+                                                        setCustomBP(prev => ({ ...prev, [index]: true }));
+                                                        formField.onChange('');
+                                                    } else {
+                                                        setCustomBP(prev => ({ ...prev, [index]: false }));
+                                                        formField.onChange(value);
+                                                    }
+                                                }}
+                                                value={customBP[index] ? 'Autre' : bonnesPratiques.includes(formField.value) ? formField.value : 'Autre'}
+                                            >
+                                                <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner ou saisir..." /></SelectTrigger></FormControl>
+                                                <SelectContent>{bonnesPratiques.map(bp => <SelectItem key={bp} value={bp}>{bp}</SelectItem>)}</SelectContent>
+                                            </Select>
+                                            {customBP[index] && (
+                                                <FormControl><Input placeholder="Précisez la bonne pratique..." {...formField} /></FormControl>
+                                            )}
+                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeComportement(index)} disabled={comportementsFields.length <= 1}><Trash2 className="h-4 w-4" /></Button>
+                                        </div>
+                                        <FormMessage />
+                                    </FormItem>
                                 )}/>
                             ))}
-                            <Button type="button" variant="outline" size="sm" onClick={() => appendComportement({ value: "" })} disabled={comportementsFields.length >= 5}><PlusCircle className="mr-2 h-4 w-4" />Ajouter un comportement</Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => appendComportement({ value: bonnesPratiques[0] })} disabled={comportementsFields.length >= 5}><PlusCircle className="mr-2 h-4 w-4" />Ajouter un comportement</Button>
                         </CardContent>
                     </Card>
 
@@ -313,8 +445,31 @@ export default function EditDialogueSecuritePage() {
                                             <FormMessage />
                                         </FormItem>)} />
                                     </div>
-                                     <FormField control={form.control} name={`anomalies.${index}.description`} render={({ field }) => (<FormItem><FormLabel>Description de l'anomalie</FormLabel><FormControl><Textarea placeholder="Décrivez précisément l'anomalie..." {...field} /></FormControl><FormMessage /></FormItem>)} />
-                                    <FormField control={form.control} name={`anomalies.${index}.actionsImmediates`} render={({ field }) => (<FormItem><FormLabel>Actions immédiates</FormLabel><FormControl><Textarea placeholder="Quelles actions ont été prises sur le champ ?" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                                    <FormField control={form.control} name={`anomalies.${index}.description`} render={({ field: descriptionField }) => (
+                                        <FormItem>
+                                            <FormLabel>Description de l'anomalie</FormLabel>
+                                            <FormControl><Textarea placeholder="Décrivez précisément l'anomalie..." {...descriptionField} /></FormControl>
+                                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                                <div className="flex items-center gap-2">
+                                                    <Button type="button" size="sm" variant="outline" onClick={() => handleRewrite(index)} disabled={aiRewriteStates[index]?.isRewriting || !descriptionField.value}>
+                                                        {aiRewriteStates[index]?.isRewriting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                                                        Reformuler
+                                                    </Button>
+                                                    {aiRewriteStates[index]?.suggestion && (
+                                                        <>
+                                                            <Button type="button" size="sm" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => acceptSuggestion(index)}><Check className="mr-2 h-4 w-4"/> Accepter</Button>
+                                                            <Button type="button" size="sm" variant="ghost" onClick={() => handleRewrite(index)}><RefreshCcw className="mr-2 h-4 w-4"/> Réessayer</Button>
+                                                            <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => revertDescription(index)}><Undo2 className="mr-2 h-4 w-4"/> Annuler</Button>
+                                                        </>
+                                                    )}
+                                                </div>
+                                                <FormMessage />
+                                            </div>
+                                        </FormItem>
+                                    )} />
+
+                                    <ActionsImmediatesArray nestIndex={index} control={form.control} />
+                                    
                                     <h5 className="font-medium pt-2">Plan d'action correctif</h5>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         <FormField control={form.control} name={`anomalies.${index}.responsable`} render={({ field }) => (
@@ -364,7 +519,7 @@ export default function EditDialogueSecuritePage() {
                                     <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2" onClick={() => removeAnomalie(index)}><Trash2 className="h-4 w-4" /></Button>
                                 </div>
                             ))}
-                            <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ type: 'AD', description: '', familleRisque: '', statut: 'En cours', actionsImmediates: '', actionsCorrectives: '', responsable: '', garant: '' })}><PlusCircle className="mr-2 h-4 w-4" />Ajouter une anomalie</Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ type: 'AD', description: '', familleRisque: '', statut: 'En cours', actionsImmediates: [], actionsCorrectives: '', responsable: '', garant: '' })}><PlusCircle className="mr-2 h-4 w-4" />Ajouter une anomalie</Button>
                         </CardContent>
                     </Card>
 
