@@ -1,7 +1,7 @@
 
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -19,7 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, ArrowLeft, Loader2 } from "lucide-react"
+import { Calendar as CalendarIcon, ArrowLeft, Loader2, X } from "lucide-react"
 import { db, storage } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, getDocs } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -27,6 +27,8 @@ import { logActivity } from '@/lib/activityLogger'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { AutocompleteInput } from '@/components/ui/autocomplete-input'
+
 
 const reunionSchema = z.object({
   nature: z.enum(["presentielle", "distancielle"], { required_error: "La nature de la réunion est requise." }),
@@ -43,11 +45,7 @@ const reunionSchema = z.object({
 
 type ReunionFormValues = z.infer<typeof reunionSchema>
 
-const timeSlots = Array.from({ length: (18 - 8) * 2 + 1 }, (_, i) => {
-    const hours = 8 + Math.floor(i / 2);
-    const minutes = (i % 2) * 30;
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
-});
+const durations = ["15 minutes", "30 minutes", "45 minutes", "60 minutes", "90 minutes", "120 minutes"];
 
 export default function NewReunionPage() {
   const { toast } = useToast()
@@ -55,8 +53,10 @@ export default function NewReunionPage() {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
+  const [participantInput, setParticipantInput] = useState('');
 
   const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
+  const userNames = useMemo(() => users.map(u => u.displayName), [users]);
   const [loadingLists, setLoadingLists] = useState(true);
 
   const form = useForm<ReunionFormValues>({
@@ -93,16 +93,25 @@ export default function NewReunionPage() {
     fetchUsers();
   }, [toast]);
   
-  const handleParticipantAdd = (name: string) => {
-    const currentParticipants = form.getValues("collaborateurs");
-    const participantList = currentParticipants ? currentParticipants.split(',').map(p => p.trim()) : [];
-    
-    const existingNames = participantList.filter(p => p);
-
-    if (!existingNames.includes(name)) {
-        const newParticipants = existingNames.length > 0 ? [...existingNames, name].join(', ') : name;
-        form.setValue("collaborateurs", newParticipants, { shouldValidate: true });
+  const handleParticipantInputChange = (newValue: string) => {
+    const selectedSuggestion = userNames.find(name => name === newValue);
+    if (selectedSuggestion) {
+        const currentParticipants = form.getValues("collaborateurs") || "";
+        const participantList = currentParticipants.split(',').map(p => p.trim()).filter(p => p);
+        if (!participantList.includes(selectedSuggestion)) {
+            form.setValue("collaborateurs", [...participantList, selectedSuggestion].join(', '), { shouldValidate: true });
+        }
+        setParticipantInput('');
+    } else {
+        setParticipantInput(newValue);
     }
+  };
+
+  const handleRemoveParticipant = (nameToRemove: string) => {
+      const currentParticipants = form.getValues("collaborateurs");
+      const participantList = currentParticipants.split(',').map(p => p.trim()).filter(p => p);
+      const newParticipants = participantList.filter(p => p !== nameToRemove).join(', ');
+      form.setValue("collaborateurs", newParticipants, { shouldValidate: true });
   };
 
 
@@ -119,7 +128,6 @@ export default function NewReunionPage() {
     
     let supportUrl = 'Aucun fichier';
 
-    // Handle file upload if a file is selected
     if (data.support && data.support.length > 0) {
         const file = data.support[0];
         const storageRef = ref(storage, `supports-reunions/${Date.now()}-${file.name}`);
@@ -138,12 +146,11 @@ export default function NewReunionPage() {
         }
     }
     
-    // Prepare data for Firestore, excluding the local file object
     const { support, ...reunionData } = data;
 
     const dataToSubmit = {
         ...reunionData,
-        supportUrl: supportUrl, // Store the URL or 'Aucun fichier'
+        supportUrl: supportUrl,
         createdBy: user.uid,
         userEmail: user.email,
         createdAt: serverTimestamp(),
@@ -242,16 +249,9 @@ export default function NewReunionPage() {
                      <FormField control={form.control} name="heure" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Heure</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="HH:MM" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {timeSlots.map(time => <SelectItem key={time} value={time}>{time}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
+                            <FormControl>
+                                <Input type="time" {...field} />
+                            </FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
@@ -264,32 +264,46 @@ export default function NewReunionPage() {
                         <FormItem><FormLabel>Animateur</FormLabel><FormControl><Input placeholder="Nom de l'animateur" {...field} readOnly /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField control={form.control} name="duree" render={({ field }) => (
-                        <FormItem><FormLabel>Durée</FormLabel><FormControl><Input placeholder="Ex: 60 minutes" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem>
+                            <FormLabel>Durée</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Choisir une durée" />
+                                    </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                    {durations.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
                     )} />
                  </div>
-                 <FormField control={form.control} name="collaborateurs" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Collaborateurs concernés</FormLabel>
-                        <FormControl><Textarea placeholder="Listez les noms ou cliquez sur les suggestions" {...field} /></FormControl>
-                        <FormDescription>Séparez les noms par une virgule.</FormDescription>
-                        <div className="pt-2 flex flex-wrap gap-1">
-                            <span className="text-sm text-muted-foreground mr-2 py-1">Suggestions:</span>
-                            {loadingLists ? <Skeleton className="h-6 w-48" /> : users.map(u => (
-                                <Badge
-                                    key={u.id}
-                                    variant="secondary"
-                                    className="cursor-pointer hover:bg-primary/20"
-                                    onClick={() => handleParticipantAdd(u.displayName)}
-                                    tabIndex={0}
-                                    onKeyDown={(e) => { if (e.key === 'Enter') handleParticipantAdd(u.displayName); }}
-                                >
-                                    {u.displayName}
-                                </Badge>
-                            ))}
-                        </div>
-                        <FormMessage />
-                    </FormItem>
-                 )} />
+                 <FormField control={form.control} name="collaborateurs" render={({ field }) => {
+                     const selectedParticipants = field.value ? field.value.split(',').map(p => p.trim()).filter(Boolean) : [];
+                     return (
+                        <FormItem>
+                            <FormLabel>Collaborateurs concernés</FormLabel>
+                            <div className="rounded-md border min-h-[40px] p-2 flex flex-wrap gap-2">
+                                {selectedParticipants.length > 0 ? selectedParticipants.map(name => (
+                                    <Badge key={name} variant="secondary" className="flex items-center gap-1">
+                                        {name}
+                                        <button type="button" onClick={() => handleRemoveParticipant(name)} className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                                            <X className="h-3 w-3" />
+                                        </button>
+                                    </Badge>
+                                )) : <span className="text-sm text-muted-foreground px-1">Aucun participant ajouté.</span>}
+                            </div>
+                            <AutocompleteInput
+                                placeholder="Rechercher un participant à ajouter..."
+                                suggestions={userNames.filter(u => !selectedParticipants.includes(u))}
+                                value={participantInput}
+                                onChange={handleParticipantInputChange}
+                            />
+                            <FormMessage />
+                        </FormItem>
+                 )}} />
                   <FormField control={form.control} name="support" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Support de réunion</FormLabel>
