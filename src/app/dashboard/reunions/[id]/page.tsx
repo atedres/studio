@@ -86,6 +86,7 @@ Vous êtes invité(e) à participer à la réunion SST suivante :
 - Heure : ${reunionData.heure}
 - Lieu / Lien : ${reunionData.lieu}
 - Animateur : ${reunionData.animateur}
+- Participants : ${reunionData.collaborateurs}
 
 Votre présence est importante.
 
