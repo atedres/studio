@@ -324,9 +324,9 @@ export default function UserManagementPage() {
                                  <FormField control={userCreationForm.control} name="position" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Poste</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingLists}>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                                             <FormControl>
-                                                <SelectTrigger>
+                                                <SelectTrigger disabled={loadingLists}>
                                                     <SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner un poste"} />
                                                 </SelectTrigger>
                                             </FormControl>
@@ -340,9 +340,9 @@ export default function UserManagementPage() {
                                 <FormField control={userCreationForm.control} name="entity" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Entité</FormLabel>
-                                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={loadingLists}>
+                                        <Select onValueChange={field.onChange} defaultValue={field.value}>
                                             <FormControl>
-                                                <SelectTrigger>
+                                                <SelectTrigger disabled={loadingLists}>
                                                     <SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner une entité"} />
                                                 </SelectTrigger>
                                             </FormControl>
@@ -449,9 +449,9 @@ export default function UserManagementPage() {
                                 <FormField control={userEditForm.control} name="position" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Poste</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value} disabled={loadingLists}>
+                                        <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl>
-                                                <SelectTrigger>
+                                                <SelectTrigger disabled={loadingLists}>
                                                     <SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner un poste"} />
                                                 </SelectTrigger>
                                             </FormControl>
@@ -465,9 +465,9 @@ export default function UserManagementPage() {
                                 <FormField control={userEditForm.control} name="entity" render={({ field }) => (
                                     <FormItem>
                                         <FormLabel>Entité</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value} disabled={loadingLists}>
+                                        <Select onValueChange={field.onChange} value={field.value}>
                                             <FormControl>
-                                                <SelectTrigger>
+                                                <SelectTrigger disabled={loadingLists}>
                                                     <SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner une entité"} />
                                                 </SelectTrigger>
                                             </FormControl>
@@ -494,3 +494,5 @@ export default function UserManagementPage() {
     </div>
   )
 }
+
+    
