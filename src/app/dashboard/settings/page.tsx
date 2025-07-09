@@ -196,7 +196,7 @@ export default function SettingsPage() {
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                          <Database className="h-5 w-5" /> Gestion des Données
+                          <Database className="h-5 w-5" /> Gestion des Données de Base
                         </CardTitle>
                         <CardDescription>
                           Ajoutez ou modifiez les entrées pour les listes déroulantes utilisées dans l'application (zones, postes, etc.).
@@ -210,7 +210,7 @@ export default function SettingsPage() {
                     <CardFooter>
                         <Button asChild>
                             <Link href="/dashboard/settings/data-management">
-                                Accéder à la gestion des données
+                                Accéder à la gestion des données de base
                             </Link>
                         </Button>
                     </CardFooter>
@@ -249,10 +249,10 @@ export default function SettingsPage() {
                     <form onSubmit={profileForm.handleSubmit(handleProfileUpdate)} className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                            <FormField control={profileForm.control} name="lastName" render={({ field }) => (
-                                <FormItem><FormLabel>Nom</FormLabel><FormControl><Input {...field} disabled={!isAdmin} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Nom</FormLabel><FormControl><Input {...field} value={field.value || ''} disabled={!isAdmin} /></FormControl><FormMessage /></FormItem>
                             )}/>
                              <FormField control={profileForm.control} name="firstName" render={({ field }) => (
-                                <FormItem><FormLabel>Prénom</FormLabel><FormControl><Input {...field} disabled={!isAdmin} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Prénom</FormLabel><FormControl><Input {...field} value={field.value || ''} disabled={!isAdmin} /></FormControl><FormMessage /></FormItem>
                             )}/>
                         </div>
                        <div>

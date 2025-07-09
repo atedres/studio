@@ -17,7 +17,7 @@ export default function DataManagementPage() {
                     <Link href="/dashboard/settings"><ArrowLeft className="h-4 w-4" /></Link>
                 </Button>
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight font-headline">Gestion des Données</h1>
+                    <h1 className="text-3xl font-bold tracking-tight font-headline">Gestion des Données de Base</h1>
                     <p className="text-muted-foreground">
                         Gérez les listes utilisées dans les formulaires de l'application.
                     </p>

@@ -76,18 +76,26 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
 
     const handleAddItem = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newItemName.trim()) {
+        const trimmedName = newItemName.trim();
+        if (!trimmedName) {
             toast({ variant: "destructive", title: "Erreur", description: "Le nom ne peut pas être vide." });
             return;
         }
+        
+        const isDuplicate = items.some(item => item.nom.toLowerCase() === trimmedName.toLowerCase());
+        if (isDuplicate) {
+            toast({ variant: "destructive", title: "Erreur", description: `L'élément "${trimmedName}" existe déjà.` });
+            return;
+        }
+
         setIsSubmitting(true);
         try {
             await addDoc(collection(db, collectionName), {
-                nom: newItemName,
+                nom: trimmedName,
                 actif: true,
             });
-            await logActivity(user, `Ajout à "${title}"`, { name: newItemName });
-            toast({ title: "Succès", description: `"${newItemName}" a été ajouté à ${title}.` });
+            await logActivity(user, `Ajout à "${title}"`, { name: trimmedName });
+            toast({ title: "Succès", description: `"${trimmedName}" a été ajouté à ${title}.` });
             setNewItemName("");
             setIsAddDialogOpen(false);
             fetchData(); // Refresh data
@@ -107,16 +115,24 @@ export function DataManagementTable({ collectionName, title }: DataManagementTab
     
     const handleUpdateItem = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!editingItem || !editedItemName.trim()) {
+        const trimmedName = editedItemName.trim();
+        if (!editingItem || !trimmedName) {
             toast({ variant: "destructive", title: "Erreur", description: "Le nom ne peut pas être vide." });
             return;
         }
+
+        const isDuplicate = items.some(item => item.id !== editingItem.id && item.nom.toLowerCase() === trimmedName.toLowerCase());
+        if (isDuplicate) {
+            toast({ variant: "destructive", title: "Erreur", description: `Un autre élément avec le nom "${trimmedName}" existe déjà.` });
+            return;
+        }
+
         setIsSubmitting(true);
         const itemRef = doc(db, collectionName, editingItem.id);
         try {
-            await updateDoc(itemRef, { nom: editedItemName });
-            await logActivity(user, `Modification de "${title}"`, { oldName: editingItem.nom, newName: editedItemName });
-            toast({ title: "Succès", description: `L'élément a été renommé en "${editedItemName}".` });
+            await updateDoc(itemRef, { nom: trimmedName });
+            await logActivity(user, `Modification de "${title}"`, { oldName: editingItem.nom, newName: trimmedName });
+            toast({ title: "Succès", description: `L'élément a été renommé en "${trimmedName}".` });
             setEditingItem(null);
             setEditedItemName("");
             setIsEditDialogOpen(false);

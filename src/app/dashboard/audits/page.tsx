@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useMemo } from "react"
 import Link from "next/link"
-import { FilePlus2, Eye, TrendingUp, AlertOctagon, UserCheck } from "lucide-react"
+import { FilePlus2, Eye, TrendingUp, AlertOctagon, UserCheck, ListChecks } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,6 +32,7 @@ import { useAuth } from "@/hooks/use-auth"
 
 interface Anomaly {
     type: "AD" | "IS" | "SD";
+    description: string;
 }
 
 interface Dialogue {
@@ -184,52 +185,63 @@ export default function DialoguesSecuritePage() {
     [...Array(rows)].map((_, i) => (
       <TableRow key={i}>
         <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
         <TableCell><Skeleton className="h-4 w-32" /></TableCell>
         <TableCell><Skeleton className="h-4 w-40" /></TableCell>
-        <TableCell><Skeleton className="h-4 w-12" /></TableCell>
+        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
         <TableCell><Skeleton className="h-6 w-32" /></TableCell>
-        <TableCell><Skeleton className="h-10 w-10" /></TableCell>
+        <TableCell><Skeleton className="h-10 w-24" /></TableCell>
       </TableRow>
     ))
   )
 
-  const renderTable = (data: Dialogue[], emptyMessage: string) => (
+  const renderTable = (data: Dialogue[], emptyMessage: string, isPendingTab = false) => (
     <Table>
         <TableHeader>
         <TableRow>
-            <TableHead>ID</TableHead>
             <TableHead>Date</TableHead>
             <TableHead>Observateur</TableHead>
             <TableHead>Zone / Unité</TableHead>
-            <TableHead>Nb. Anomalies</TableHead>
+            <TableHead>Anomalies Signalées</TableHead>
             <TableHead>Statut</TableHead>
-            <TableHead><span className="sr-only">Actions</span></TableHead>
+            <TableHead className="text-right">Actions</TableHead>
         </TableRow>
         </TableHeader>
         <TableBody>
         {loading ? renderSkeleton() : data.length > 0 ? data.map((dialogue) => (
             <TableRow key={dialogue.id}>
-            <TableCell className="font-medium">{dialogue.id.substring(0,8)}...</TableCell>
             <TableCell>{new Date(dialogue.date.seconds * 1000).toLocaleDateString('fr-FR')}</TableCell>
             <TableCell>{dialogue.observateur}</TableCell>
             <TableCell>{dialogue.zone}</TableCell>
-            <TableCell className="text-center">{dialogue.anomalies.length}</TableCell>
+            <TableCell className="max-w-[300px]">
+                 {dialogue.anomalies.length > 0 ? (
+                    <ul className="list-disc list-inside space-y-1 text-xs">
+                        {dialogue.anomalies.map((anomalie, index) => (
+                            <li key={index} className="truncate" title={anomalie.description}>{anomalie.description}</li>
+                        ))}
+                    </ul>
+                ) : (
+                    <span className="text-xs text-muted-foreground">Aucune</span>
+                )}
+            </TableCell>
             <TableCell>
                 <Badge variant={getStatusVariant(dialogue.status) as any}>{dialogue.status}</Badge>
             </TableCell>
             <TableCell className="text-right">
-                    <Button asChild variant="outline" size="icon">
+                    <Button asChild variant="outline" size="sm">
                         <Link href={
                             dialogue.status === 'Brouillon' ? `/dashboard/audits/${dialogue.id}/edit` : 
                             dialogue.status === 'En attente de validation' && canManage ? `/dashboard/audits/${dialogue.id}/validate` :
                             `/dashboard/audits/${dialogue.id}`
                         }>
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">
-                                {dialogue.status === 'Brouillon' ? 'Modifier' : 
-                                 dialogue.status === 'En attente de validation' && canManage ? 'Valider' : 'Voir'}
-                            </span>
+                            {dialogue.status === 'En attente de validation' && canManage ? (
+                                <>
+                                 <ListChecks className="mr-2 h-4 w-4" /> Traiter
+                                </>
+                            ): (
+                                <>
+                                  <Eye className="mr-2 h-4 w-4" /> {dialogue.status === 'Brouillon' ? 'Modifier' : 'Voir'}
+                                </>
+                            )}
                         </Link>
                     </Button>
                 </TableCell>
@@ -305,7 +317,7 @@ export default function DialoguesSecuritePage() {
                                 <CardDescription>Ces dialogues doivent être revus et validés.</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                {renderTable(pendingDialogues, "Aucun dialogue en attente de validation.")}
+                                {renderTable(pendingDialogues, "Aucun dialogue en attente de validation.", true)}
                             </CardContent>
                         </Card>
                     </TabsContent>
@@ -365,3 +377,4 @@ export default function DialoguesSecuritePage() {
     </div>
   )
 }
+
