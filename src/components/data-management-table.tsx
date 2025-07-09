@@ -12,8 +12,8 @@ import * as z from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 
 import { Button, buttonVariants } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetDescription, SheetFooter, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -35,6 +35,7 @@ interface RelationConfig {
     collectionName: string;
     label: string;
     formField: "zones" | "types";
+    options?: Option[];
 }
 
 interface DataManagementTableProps {
@@ -74,9 +75,17 @@ export function DataManagementTable({ collectionName, title, relationConfig }: D
             setItems(dataList);
 
             if (relationConfig) {
-                const relQ = query(collection(db, relationConfig.collectionName), where("actif", "==", true), orderBy("nom"));
-                const relSnapshot = await getDocs(relQ);
-                setRelationOptions(relSnapshot.docs.map(doc => ({ value: doc.data().nom, label: doc.data().nom })));
+                if (relationConfig.collectionName === "typesAnomalie") {
+                     setRelationOptions([
+                        { value: "AD", label: "Acte Dangereux (AD)"},
+                        { value: "IS", label: "Situation Dangereuse (IS)"},
+                        { value: "SD", label: "Système Défaillant (SD)"},
+                     ]);
+                } else {
+                    const relQ = query(collection(db, relationConfig.collectionName), where("actif", "==", true), orderBy("nom"));
+                    const relSnapshot = await getDocs(relQ);
+                    setRelationOptions(relSnapshot.docs.map(doc => ({ value: doc.data().nom, label: doc.data().nom })));
+                }
             }
         } catch (error) {
             console.error(`Error fetching data for ${title}: `, error);
@@ -246,7 +255,7 @@ export function DataManagementTable({ collectionName, title, relationConfig }: D
             </div>
             
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetContent>
+                <SheetContent className="flex flex-col">
                     <SheetHeader>
                         <SheetTitle>{editingItem ? `Modifier "${editingItem.nom}"` : `Ajouter à "${title}"`}</SheetTitle>
                         <SheetDescription>
@@ -254,7 +263,7 @@ export function DataManagementTable({ collectionName, title, relationConfig }: D
                         </SheetDescription>
                     </SheetHeader>
                     <Form {...form}>
-                        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="flex flex-col h-full">
+                        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="flex-1 flex flex-col">
                            <div className="flex-1 overflow-y-auto pr-6 -mr-6 py-4 space-y-8">
                              <FormField
                                 control={form.control}
@@ -302,3 +311,5 @@ export function DataManagementTable({ collectionName, title, relationConfig }: D
         </div>
     );
 }
+
+    
