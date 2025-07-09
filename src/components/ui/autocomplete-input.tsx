@@ -14,24 +14,14 @@ interface AutocompleteInputProps {
 }
 
 export function AutocompleteInput({ value, onChange, suggestions, placeholder, className }: AutocompleteInputProps) {
-    const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
 
-    useEffect(() => {
-        if (value && value.length > 0) {
-            const lowercasedValue = value.toLowerCase();
-            const filtered = suggestions.filter(suggestion =>
-                suggestion.toLowerCase().includes(lowercasedValue)
-            ).slice(0, 5); // Limit to 5 suggestions
-            setFilteredSuggestions(filtered);
-            setIsOpen(filtered.length > 0 && document.activeElement === inputRef.current);
-        } else {
-            setFilteredSuggestions([]);
-            setIsOpen(false);
-        }
-    }, [value, suggestions]);
+    const filteredSuggestions = value.length > 0
+        ? suggestions.filter(suggestion =>
+            suggestion.toLowerCase().includes(value.toLowerCase())
+          ).slice(0, 5)
+        : [];
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -53,11 +43,21 @@ export function AutocompleteInput({ value, onChange, suggestions, placeholder, c
     return (
         <div className={cn("relative", className)} ref={containerRef}>
             <Input
-                ref={inputRef}
                 type="text"
                 value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
-                onFocus={() => value && filteredSuggestions.length > 0 && setIsOpen(true)}
+                onChange={(e) => {
+                    onChange(e.target.value);
+                    if (e.target.value.length > 0) {
+                        setIsOpen(true);
+                    } else {
+                        setIsOpen(false);
+                    }
+                }}
+                onFocus={() => {
+                    if (value.length > 0 && filteredSuggestions.length > 0) {
+                        setIsOpen(true);
+                    }
+                }}
                 placeholder={placeholder}
                 autoComplete="off"
             />
