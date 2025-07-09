@@ -102,6 +102,13 @@ const ActionsImmediatesArray = ({ nestIndex, control }: { nestIndex: number; con
   );
 };
 
+// Define more specific types for our list data
+interface Zone { id: string; nom: string; }
+interface Poste { id: string; nom: string; zone: string; }
+interface Activite { id: string; nom: string; zone: string; }
+interface FamilleRisque { id: string; nom: string; types: string[]; }
+
+
 export default function NewDialogueSecuritePage() {
   const { toast } = useToast()
   const { user } = useAuth()
@@ -111,11 +118,16 @@ export default function NewDialogueSecuritePage() {
   const [isDatePickerOpen, setIsDatePickerOpen] = React.useState(false)
   const [openEcheancePopovers, setOpenEcheancePopovers] = React.useState<Record<number, boolean>>({})
 
-  const [zones, setZones] = useState<string[]>([]);
-  const [postes, setPostes] = useState<string[]>([]);
-  const [activites, setActivites] = useState<string[]>([]);
-  const [familles, setFamilles] = useState<string[]>([]);
+  // State for lists
+  const [zones, setZones] = useState<Zone[]>([]);
+  const [postes, setPostes] = useState<Poste[]>([]);
+  const [activites, setActivites] = useState<Activite[]>([]);
+  const [familles, setFamilles] = useState<FamilleRisque[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
+
+  // State for filtered lists
+  const [filteredPostes, setFilteredPostes] = useState<Poste[]>([]);
+  const [filteredActivites, setFilteredActivites] = useState<Activite[]>([]);
 
   const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
   const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
@@ -141,7 +153,7 @@ export default function NewDialogueSecuritePage() {
             const fetchData = async (collectionName: string) => {
                 const q = query(collection(db, collectionName), where("actif", "==", true));
                 const snapshot = await getDocs(q);
-                return snapshot.docs.map(doc => doc.data().nom as string);
+                return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
             };
 
             const fetchUsers = async () => {
@@ -151,13 +163,19 @@ export default function NewDialogueSecuritePage() {
                 setUsers(usersList);
             };
 
-            await Promise.all([
-                fetchData("zonesDeTravail").then(setZones),
-                fetchData("postesDeTravail").then(setPostes),
-                fetchData("activitesObservees").then(setActivites),
-                fetchData("famillesDeRisque").then(setFamilles),
-                fetchUsers()
+            const [zonesData, postesData, activitesData, famillesData] = await Promise.all([
+                fetchData("zonesDeTravail"),
+                fetchData("postesDeTravail"),
+                fetchData("activitesObservees"),
+                fetchData("famillesDeRisque"),
             ]);
+            
+            setZones(zonesData);
+            setPostes(postesData);
+            setActivites(activitesData);
+            setFamilles(famillesData);
+
+            await fetchUsers();
 
         } catch (error) {
             console.error("Error fetching lists: ", error);
@@ -173,6 +191,28 @@ export default function NewDialogueSecuritePage() {
 
     fetchLists();
   }, [toast]);
+  
+  const selectedZone = form.watch('zone');
+
+  useEffect(() => {
+    if (selectedZone) {
+      setFilteredPostes(postes.filter(p => p.zone === selectedZone));
+      setFilteredActivites(activites.filter(a => a.zone === selectedZone));
+      // Reset dependent fields if their current value is not in the new filtered list
+      const currentPoste = form.getValues('poste');
+      if (currentPoste && !postes.some(p => p.zone === selectedZone && p.nom === currentPoste)) {
+        form.setValue('poste', '');
+      }
+      const currentActivite = form.getValues('activite');
+      if (currentActivite && !activites.some(a => a.zone === selectedZone && a.nom === currentActivite)) {
+        form.setValue('activite', '');
+      }
+    } else {
+      setFilteredPostes([]);
+      setFilteredActivites([]);
+    }
+  }, [selectedZone, postes, activites, form]);
+
 
   const { fields: comportementsFields, append: appendComportement, remove: removeComportement } = useFieldArray({
     name: "comportementsPositifs",
@@ -383,32 +423,36 @@ export default function NewDialogueSecuritePage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-              <FormField control={form.control} name="activite" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Activité observée</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
-                        <SelectContent>{activites.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )} />
               <FormField control={form.control} name="zone" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Zone / Unité</FormLabel>
-                     <Select onValueChange={field.onChange} value={field.value}>
+                     <Select onValueChange={(value) => {
+                        field.onChange(value);
+                        form.setValue('poste', '');
+                        form.setValue('activite', '');
+                     }} value={field.value}>
                         <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
-                        <SelectContent>{zones.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                        <SelectContent>{zones.map(item => <SelectItem key={item.id} value={item.nom}>{item.nom}</SelectItem>)}</SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )} />
-              <FormField control={form.control} name="poste" render={({ field }) => (
+                 <FormField control={form.control} name="poste" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Poste de travail</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
-                        <SelectContent>{postes.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                        <FormControl><SelectTrigger disabled={!selectedZone || loadingLists}><SelectValue placeholder={!selectedZone ? "Choisir une zone d'abord" : "Sélectionner..."} /></SelectTrigger></FormControl>
+                        <SelectContent>{filteredPostes.map(item => <SelectItem key={item.id} value={item.nom}>{item.nom}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                 <FormField control={form.control} name="activite" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Activité observée</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                        <FormControl><SelectTrigger disabled={!selectedZone || loadingLists}><SelectValue placeholder={!selectedZone ? "Choisir une zone d'abord" : "Sélectionner..."} /></SelectTrigger></FormControl>
+                        <SelectContent>{filteredActivites.map(item => <SelectItem key={item.id} value={item.nom}>{item.nom}</SelectItem>)}</SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
@@ -421,7 +465,7 @@ export default function NewDialogueSecuritePage() {
                   </FormItem>
                 )} />
               <FormField control={form.control} name="identification" render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="lg:col-span-3">
                     <FormLabel>Identification (Nom ou matricule)</FormLabel>
                     <FormControl>
                         <AutocompleteInput
@@ -457,7 +501,7 @@ export default function NewDialogueSecuritePage() {
                                             formField.onChange(value);
                                         }
                                     }}
-                                    value={customBP[index] ? 'Autre' : formField.value}
+                                    value={customBP[index] ? 'Autre' : bonnesPratiques.includes(formField.value) ? formField.value : 'Autre'}
                                 >
                                     <FormControl><SelectTrigger className="w-full md:w-[250px]"><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
                                     <SelectContent>{bonnesPratiques.map(bp => <SelectItem key={bp} value={bp}>{bp}</SelectItem>)}</SelectContent>
@@ -484,14 +528,21 @@ export default function NewDialogueSecuritePage() {
               <CardDescription>Saisissez les écarts par rapport aux règles de sécurité.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                {anomaliesFields.map((field, index) => (
+                {anomaliesFields.map((field, index) => {
+                    const selectedType = form.watch(`anomalies.${index}.type`);
+                    const filteredFamilles = familles.filter(f => f.types.includes(selectedType));
+
+                    return (
                     <div key={field.id} className="p-4 border rounded-lg space-y-4 relative">
                         <h4 className="font-semibold">Anomalie n°{index + 1}</h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <FormField control={form.control} name={`anomalies.${index}.type`} render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Type d'anomalie</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={(value) => {
+                                        field.onChange(value);
+                                        form.setValue(`anomalies.${index}.familleRisque`, '');
+                                    }} defaultValue={field.value}>
                                     <FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         <SelectItem value="AD">Acte Dangereux (AD)</SelectItem>
@@ -506,9 +557,9 @@ export default function NewDialogueSecuritePage() {
                                 <FormItem>
                                     <FormLabel>Famille de risque</FormLabel>
                                     <Select onValueChange={field.onChange} value={field.value}>
-                                    <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                    <FormControl><SelectTrigger disabled={!selectedType || loadingLists}><SelectValue placeholder={!selectedType ? "Choisir un type d'abord" : "Sélectionner..."} /></SelectTrigger></FormControl>
                                     <SelectContent>
-                                        {familles.map(famille => <SelectItem key={famille} value={famille}>{famille}</SelectItem>)}
+                                        {filteredFamilles.map(famille => <SelectItem key={famille.id} value={famille.nom}>{famille.nom}</SelectItem>)}
                                     </SelectContent>
                                     </Select>
                                     <FormMessage />
@@ -548,7 +599,7 @@ export default function NewDialogueSecuritePage() {
                                     <AutocompleteInput
                                         placeholder="Nom du responsable"
                                         suggestions={userNames}
-                                        value={field.value || ''}
+                                        value={field.value ?? ''}
                                         onChange={field.onChange}
                                      />
                                   </FormControl>
@@ -561,7 +612,7 @@ export default function NewDialogueSecuritePage() {
                                      <AutocompleteInput
                                         placeholder="Nom du garant"
                                         suggestions={userNames}
-                                        value={field.value || ''}
+                                        value={field.value ?? ''}
                                         onChange={field.onChange}
                                      />
                                    </FormControl>
@@ -604,7 +655,7 @@ export default function NewDialogueSecuritePage() {
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>
-                ))}
+                    )})}
                 <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ type: 'AD', description: '', familleRisque: '', statut: 'En cours', actionsImmediates: [], actionsCorrectives: '', responsable: '', garant: '' })}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Ajouter une anomalie

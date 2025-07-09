@@ -103,6 +103,12 @@ const ActionsImmediatesArray = ({ nestIndex, control }: { nestIndex: number; con
   );
 };
 
+// Define more specific types for our list data
+interface Zone { id: string; nom: string; }
+interface Poste { id: string; nom: string; zone: string; }
+interface Activite { id: string; nom: string; zone: string; }
+interface FamilleRisque { id: string; nom: string; types: string[]; }
+
 
 export default function EditDialogueSecuritePage() {
     const { toast } = useToast()
@@ -116,11 +122,16 @@ export default function EditDialogueSecuritePage() {
     const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
     const [openEcheancePopovers, setOpenEcheancePopovers] = useState<Record<number, boolean>>({})
 
-    const [zones, setZones] = useState<string[]>([]);
-    const [postes, setPostes] = useState<string[]>([]);
-    const [activites, setActivites] = useState<string[]>([]);
-    const [familles, setFamilles] = useState<string[]>([]);
+    // State for lists
+    const [zones, setZones] = useState<Zone[]>([]);
+    const [postes, setPostes] = useState<Poste[]>([]);
+    const [activites, setActivites] = useState<Activite[]>([]);
+    const [familles, setFamilles] = useState<FamilleRisque[]>([]);
     const [loadingLists, setLoadingLists] = useState(true);
+
+    // State for filtered lists
+    const [filteredPostes, setFilteredPostes] = useState<Poste[]>([]);
+    const [filteredActivites, setFilteredActivites] = useState<Activite[]>([]);
 
     const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
     const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
@@ -141,7 +152,7 @@ export default function EditDialogueSecuritePage() {
                 const fetchData = async (collectionName: string) => {
                     const q = query(collection(db, collectionName), where("actif", "==", true));
                     const snapshot = await getDocs(q);
-                    return snapshot.docs.map(doc => doc.data().nom as string);
+                    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
                 };
 
                 const fetchUsers = async () => {
@@ -151,13 +162,19 @@ export default function EditDialogueSecuritePage() {
                     setUsers(usersList);
                 };
 
-                await Promise.all([
-                    fetchData("zonesDeTravail").then(setZones),
-                    fetchData("postesDeTravail").then(setPostes),
-                    fetchData("activitesObservees").then(setActivites),
-                    fetchData("famillesDeRisque").then(setFamilles),
-                    fetchUsers()
+                const [zonesData, postesData, activitesData, famillesData] = await Promise.all([
+                    fetchData("zonesDeTravail"),
+                    fetchData("postesDeTravail"),
+                    fetchData("activitesObservees"),
+                    fetchData("famillesDeRisque"),
                 ]);
+                
+                setZones(zonesData);
+                setPostes(postesData);
+                setActivites(activitesData);
+                setFamilles(famillesData);
+
+                await fetchUsers();
 
             } catch (error) {
                 console.error("Error fetching lists: ", error);
@@ -173,6 +190,19 @@ export default function EditDialogueSecuritePage() {
 
         fetchLists();
     }, [toast]);
+    
+    const selectedZone = form.watch('zone');
+
+    useEffect(() => {
+      if (selectedZone) {
+        setFilteredPostes(postes.filter(p => p.zone === selectedZone));
+        setFilteredActivites(activites.filter(a => a.zone === selectedZone));
+      } else {
+        setFilteredPostes(postes);
+        setFilteredActivites(activites);
+      }
+    }, [selectedZone, postes, activites]);
+
 
     useEffect(() => {
         if (!id) return;
@@ -185,7 +215,6 @@ export default function EditDialogueSecuritePage() {
             if (docSnap.exists()) {
                 const data = docSnap.data();
                 
-                // Initialize customBP state based on loaded data
                 const initialCustomBP: Record<number, boolean> = {};
                 if (data.comportementsPositifs && Array.isArray(data.comportementsPositifs)) {
                     data.comportementsPositifs.forEach((comp: { value: string }, index: number) => {
@@ -348,38 +377,46 @@ export default function EditDialogueSecuritePage() {
                             <FormField control={form.control} name="observateur" render={({ field }) => (
                                 <FormItem><FormLabel>Observateur</FormLabel><FormControl><Input {...field} readOnly /></FormControl><FormMessage /></FormItem>
                             )} />
-                            <FormField control={form.control} name="activite" render={({ field }) => (
-                                <FormItem><FormLabel>Activité observée</FormLabel>
-                                     <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
-                                        <SelectContent>{activites.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
                             <FormField control={form.control} name="zone" render={({ field }) => (
-                                <FormItem><FormLabel>Zone / Unité</FormLabel>
+                                <FormItem>
+                                    <FormLabel>Zone / Unité</FormLabel>
+                                    <Select onValueChange={(value) => {
+                                        field.onChange(value);
+                                        form.setValue('poste', '');
+                                        form.setValue('activite', '');
+                                    }} value={field.value}>
+                                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                        <SelectContent>{zones.map(item => <SelectItem key={item.id} value={item.nom}>{item.nom}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                             <FormField control={form.control} name="poste" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Poste de travail</FormLabel>
                                     <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
-                                        <SelectContent>{zones.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                                        <FormControl><SelectTrigger disabled={!selectedZone || loadingLists}><SelectValue placeholder={!selectedZone ? "Choisir une zone d'abord" : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                        <SelectContent>{filteredPostes.map(item => <SelectItem key={item.id} value={item.nom}>{item.nom}</SelectItem>)}</SelectContent>
                                     </Select>
                                     <FormMessage />
                                 </FormItem>
                             )} />
-                            <FormField control={form.control} name="poste" render={({ field }) => (
-                                <FormItem><FormLabel>Poste de travail</FormLabel>
-                                     <Select onValueChange={field.onChange} value={field.value}>
-                                        <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
-                                        <SelectContent>{postes.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                            <FormField control={form.control} name="activite" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Activité observée</FormLabel>
+                                    <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl><SelectTrigger disabled={!selectedZone || loadingLists}><SelectValue placeholder={!selectedZone ? "Choisir une zone d'abord" : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                        <SelectContent>{filteredActivites.map(item => <SelectItem key={item.id} value={item.nom}>{item.nom}</SelectItem>)}</SelectContent>
                                     </Select>
                                     <FormMessage />
                                 </FormItem>
                             )} />
+                           
                             <FormField control={form.control} name="nombrePersonnes" render={({ field }) => (
                                 <FormItem><FormLabel>Nombre de personnes</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                             )} />
                             <FormField control={form.control} name="identification" render={({ field }) => (
-                                 <FormItem><FormLabel>Identification (Nom ou matricule)</FormLabel>
+                                 <FormItem className="lg:col-span-3"><FormLabel>Identification (Nom ou matricule)</FormLabel>
                                     <FormControl>
                                         <AutocompleteInput
                                           placeholder="Nom ou matricule de la personne observée"
@@ -432,15 +469,22 @@ export default function EditDialogueSecuritePage() {
                     <Card>
                         <CardHeader><CardTitle>Anomalies Constatées</CardTitle><CardDescription>Saisissez les écarts par rapport aux règles de sécurité.</CardDescription></CardHeader>
                         <CardContent className="space-y-6">
-                            {anomaliesFields.map((field, index) => (
+                            {anomaliesFields.map((field, index) => {
+                                const selectedType = form.watch(`anomalies.${index}.type`);
+                                const filteredFamilles = familles.filter(f => f.types.includes(selectedType));
+
+                                return (
                                 <div key={field.id} className="p-4 border rounded-lg space-y-4 relative">
                                     <h4 className="font-semibold">Anomalie n°{index + 1}</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                       <FormField control={form.control} name={`anomalies.${index}.type`} render={({ field }) => (<FormItem><FormLabel>Type d'anomalie</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="AD">Acte Dangereux (AD)</SelectItem><SelectItem value="IS">Situation Dangereuse (IS)</SelectItem><SelectItem value="SD">Système Défaillant (SD)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
+                                       <FormField control={form.control} name={`anomalies.${index}.type`} render={({ field }) => (<FormItem><FormLabel>Type d'anomalie</FormLabel><Select onValueChange={(value) => {
+                                            field.onChange(value);
+                                            form.setValue(`anomalies.${index}.familleRisque`, '');
+                                        }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="AD">Acte Dangereux (AD)</SelectItem><SelectItem value="IS">Situation Dangereuse (IS)</SelectItem><SelectItem value="SD">Système Défaillant (SD)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
                                         <FormField control={form.control} name={`anomalies.${index}.familleRisque`} render={({ field }) => (<FormItem><FormLabel>Famille de risque</FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value}>
-                                                <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
-                                                <SelectContent>{familles.map(famille => <SelectItem key={famille} value={famille}>{famille}</SelectItem>)}</SelectContent>
+                                                <FormControl><SelectTrigger disabled={!selectedType || loadingLists}><SelectValue placeholder={!selectedType ? "Choisir un type d'abord" : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                                <SelectContent>{filteredFamilles.map(famille => <SelectItem key={famille.id} value={famille.nom}>{famille.nom}</SelectItem>)}</SelectContent>
                                             </Select>
                                             <FormMessage />
                                         </FormItem>)} />
@@ -478,7 +522,7 @@ export default function EditDialogueSecuritePage() {
                                                 <AutocompleteInput
                                                     placeholder="Nom du responsable"
                                                     suggestions={userNames}
-                                                    value={field.value || ''}
+                                                    value={field.value ?? ''}
                                                     onChange={field.onChange}
                                                  />
                                               </FormControl>
@@ -491,7 +535,7 @@ export default function EditDialogueSecuritePage() {
                                                  <AutocompleteInput
                                                     placeholder="Nom du garant"
                                                     suggestions={userNames}
-                                                    value={field.value || ''}
+                                                    value={field.value ?? ''}
                                                     onChange={field.onChange}
                                                  />
                                                </FormControl>
@@ -518,7 +562,7 @@ export default function EditDialogueSecuritePage() {
                                     </div>
                                     <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2" onClick={() => removeAnomalie(index)}><Trash2 className="h-4 w-4" /></Button>
                                 </div>
-                            ))}
+                                )})}
                             <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ type: 'AD', description: '', familleRisque: '', statut: 'En cours', actionsImmediates: [], actionsCorrectives: '', responsable: '', garant: '' })}><PlusCircle className="mr-2 h-4 w-4" />Ajouter une anomalie</Button>
                         </CardContent>
                     </Card>
