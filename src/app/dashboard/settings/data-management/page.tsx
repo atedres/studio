@@ -19,7 +19,7 @@ export default function DataManagementPage() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight font-headline">Gestion des Données de Base</h1>
                     <p className="text-muted-foreground">
-                        Gérez les listes utilisées dans les formulaires de l'application et leurs relations.
+                        Gérez les listes utilisées dans les formulaires de l'application.
                     </p>
                 </div>
             </div>
@@ -28,7 +28,7 @@ export default function DataManagementPage() {
                 <CardHeader>
                     <CardTitle>Données de Référence</CardTitle>
                     <CardDescription>
-                        Ajoutez, modifiez ou désactivez les options et liez-les entre elles pour une saisie de formulaire cohérente.
+                        Ajoutez, modifiez ou désactivez les options pour les listes déroulantes des formulaires.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -43,10 +43,6 @@ export default function DataManagementPage() {
                             <DataManagementTable
                                 collectionName="zonesDeTravail"
                                 title="Zones de Travail"
-                                relations={[
-                                    { collectionName: "postesDeTravail", label: "Postes de Travail Liés", fieldName: "postes" },
-                                    { collectionName: "activitesObservees", label: "Activités Observées Liées", fieldName: "activites" }
-                                ]}
                             />
                         </TabsContent>
                         <TabsContent value="postes" className="mt-4">
@@ -65,9 +61,6 @@ export default function DataManagementPage() {
                              <DataManagementTable
                                 collectionName="famillesDeRisque"
                                 title="Familles de Risque"
-                                relations={[
-                                    { staticOptions: ["AD", "IS", "SD"], label: "Types d'Anomalie Liés", fieldName: "types" }
-                                ]}
                             />
                         </TabsContent>
                     </Tabs>
