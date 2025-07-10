@@ -23,8 +23,8 @@ const Logo = () => (
 <svg width="200" height="50" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="grad1" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" style={{stopColor:"#F58220",stopOpacity:"1"}} />
-      <stop offset="100%" style={{stopColor:"#FFD200",stopOpacity:"1"}} />
+      <stop offset="0%" style={{stopColor:"#F58220",stopOpacity:1}} />
+      <stop offset="100%" style={{stopColor:"#FFD200",stopOpacity:1}} />
     </linearGradient>
   </defs>
   <path d="M42.33,26.12c-5.89-1.14-10.3-6.07-10.3-12.04c0-6.72,5.45-12.17,12.17-12.17c2.39,0,4.64,0.7,6.56,1.93c-2.43-1.63-5.38-2.63-8.56-2.63c-8.28,0-15,6.72-15,15c0,7.34,5.27,13.45,12.11,14.74L42.33,26.12z" fill="#E6E7E8"/>
