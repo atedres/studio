@@ -42,13 +42,13 @@ const dialogueSecuriteSchema = z.object({
     description: z.string().min(1, "La description est requise."),
     familleRisque: z.string().min(1, "La famille de risque est requise."),
     actionsImmediates: z.array(z.object({ value: z.string().min(1, "L'action immédiate ne peut être vide.") })).optional(),
-    actionsCorrectives: z.string().optional(),
+    actionsCorrectives: z.string().optional().default(''),
     echeance: z.date().optional(),
-    garant: z.string().optional(),
-    responsable: z.string().optional(),
+    garant: z.string().optional().default(''),
+    responsable: z.string().optional().default(''),
     statut: z.enum(["En cours", "Réalisée", "Non réalisée"], { required_error: "Le statut est requis." }),
   })),
-  commentaires: z.string().optional(),
+  commentaires: z.string().optional().default(''),
 })
 
 type DialogueSecuriteFormValues = z.infer<typeof dialogueSecuriteSchema>
@@ -141,6 +141,7 @@ export default function NewDialogueSecuritePage() {
       comportementsPositifs: [{ value: bonnesPratiques[0] }],
       anomalies: [],
       identification: "",
+      commentaires: "",
     },
   })
 
@@ -732,5 +733,3 @@ export default function NewDialogueSecuritePage() {
     </div>
   )
 }
-
-    
