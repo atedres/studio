@@ -24,7 +24,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { PlusCircle, Eye, CalendarCheck, Users, TrendingUp } from "lucide-react"
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts"
 import { db } from "@/lib/firebase"
-import { collection, getDocs, query, orderBy, Timestamp } from "firebase/firestore"
+import { collection, getDocs, query, orderBy, Timestamp, where } from "firebase/firestore"
 import { startOfMonth, subMonths, format } from 'date-fns'
 import { useAuth } from "@/hooks/use-auth"
 
@@ -80,14 +80,54 @@ export default function ReunionsPage() {
       return;
     }
     const fetchReunions = async () => {
+        if (!user) return;
         setLoading(true);
         try {
-            const q = query(collection(db, "reunions"), orderBy("date", "desc"));
-            const querySnapshot = await getDocs(q);
-            const reunionsData = querySnapshot.docs.map(doc => ({
+            const baseQuery = collection(db, "reunions");
+            let reunionsQuery;
+            
+            const highLevelRoles = ['niveau3', 'niveau4', 'niveau5'];
+
+            if (user.role === 'admin') {
+                reunionsQuery = query(baseQuery, orderBy("date", "desc"));
+            } else if (highLevelRoles.includes(user.role)) {
+                // For high-level roles, we can't do an OR query in Firestore.
+                // We'll fetch meetings for their unit, and then client-side filter for their personal meetings.
+                reunionsQuery = query(baseQuery, where("zone", "==", user.entity), orderBy("date", "desc"));
+            } else {
+                // For niveau1 and niveau2, we also can't do an OR query.
+                // It's more efficient to fetch all and filter client-side if the number of total meetings isn't huge.
+                // If performance becomes an issue, this needs to be refactored with a more complex data model.
+                reunionsQuery = query(baseQuery, orderBy("date", "desc"));
+            }
+
+            const querySnapshot = await getDocs(reunionsQuery);
+            let reunionsData = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             })) as Reunion[];
+            
+            // Client-side filtering for non-admins
+            if (user.role !== 'admin') {
+                reunionsData = reunionsData.filter(reunion => {
+                    const isAnimateur = reunion.animateur === user.displayName;
+                    // @ts-ignore
+                    const isParticipant = reunion.collaborateurs?.includes(user.displayName);
+                    
+                    if (highLevelRoles.includes(user.role)) {
+                        // @ts-ignore
+                        return reunion.zone === user.entity || isAnimateur || isParticipant;
+                    } else { // niveau1, niveau2
+                        return isAnimateur || isParticipant;
+                    }
+                });
+            }
+
+            // Remove duplicates in case a manager is also a participant in a meeting outside their unit
+            reunionsData = reunionsData.filter((reunion, index, self) =>
+                index === self.findIndex((r) => r.id === reunion.id)
+            );
+
             setReunions(reunionsData);
             calculateStats(reunionsData);
         } catch (error) {
@@ -141,7 +181,7 @@ export default function ReunionsPage() {
     }
 
     fetchReunions();
-  }, [isDemoMode]);
+  }, [isDemoMode, user]);
 
   const getStatusVariant = (status: string) => {
     switch (status) {

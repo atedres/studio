@@ -109,13 +109,18 @@ export function NotificationBell() {
                     });
                 } catch (e) { console.error("Error fetching CAA tasks:", e) }
 
-                // 3. Réunions
+                // 3. Réunions - Fetch all and filter client-side based on user's visibility rules
                 try {
                     const meetingsQuery = query(collection(db, 'reunions'), where('status', '==', 'Planifiée'));
                     const meetingsSnapshot = await getDocs(meetingsQuery);
                     meetingsSnapshot.forEach(doc => {
                         const data = doc.data();
-                        if (data.collaborateurs && data.collaborateurs.includes(myName)) {
+                        
+                        const isAnimateur = data.animateur === myName;
+                        const isParticipant = data.collaborateurs && data.collaborateurs.includes(myName);
+                        const isInUnit = user.role && ['niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role) && data.zone === user.entity;
+
+                        if (isAnimateur || isParticipant || isInUnit || user.role === 'admin') {
                              allNotifs.push({
                                 id: `meeting-${doc.id}`,
                                 message: `Invitation réunion : ${data.objet}`,

@@ -23,7 +23,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
 import { Calendar as CalendarIcon, ArrowLeft, Loader2, X, AlertTriangle } from "lucide-react"
 import { db, storage } from "@/lib/firebase"
-import { doc, getDoc, updateDoc, Timestamp, collection, getDocs } from "firebase/firestore"
+import { doc, getDoc, updateDoc, Timestamp, collection, getDocs, query, where } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { logActivity } from '@/lib/activityLogger'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +37,7 @@ const reunionSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
   heure: z.string().min(1, "L'heure est requise."),
   lieu: z.string().min(1, "Le lieu est requis."),
+  zone: z.string().min(1, "La zone/unité est requise."),
   animateur: z.string().min(1, "L'animateur est requis."),
   duree: z.string().min(1, "La durée est requise."),
   collaborateurs: z.string().min(1, "Les collaborateurs sont requis."),
@@ -56,6 +57,7 @@ const demoReunion: ReunionFormValues = {
     date: new Date(),
     heure: '10:00',
     lieu: 'Salle de conférence principale',
+    zone: 'Laminoir',
     animateur: 'Y. Alaoui (Démo)',
     duree: '90 minutes',
     collaborateurs: 'A. Saidi, F. Ziani, C. Petit',
@@ -79,6 +81,7 @@ export default function EditReunionPage() {
 
   const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
   const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
+  const [zones, setZones] = useState<string[]>([]);
   const [loadingLists, setLoadingLists] = useState(true);
 
   const form = useForm<ReunionFormValues>({
@@ -87,22 +90,27 @@ export default function EditReunionPage() {
   })
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchLists = async () => {
         setLoadingLists(true);
         try {
             const usersCollection = collection(db, "users");
             const usersSnapshot = await getDocs(usersCollection);
             const usersList = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as { id: string, displayName: string }[];
             setUsers(usersList);
+
+            const zonesQuery = query(collection(db, "zonesDeTravail"), where("actif", "==", true));
+            const zonesSnapshot = await getDocs(zonesQuery);
+            const zonesList = zonesSnapshot.docs.map(doc => doc.data().nom as string);
+            setZones(zonesList);
         } catch (error) {
-            console.error("Error fetching users: ", error);
-            toast({ variant: "destructive", title: "Erreur", description: "Impossible de charger la liste des utilisateurs." });
+            console.error("Error fetching lists: ", error);
+            toast({ variant: "destructive", title: "Erreur", description: "Impossible de charger les listes de sélection." });
         } finally {
             setLoadingLists(false);
         }
     };
     if (!isDemoMode) {
-        fetchUsers();
+        fetchLists();
     } else {
         setLoadingLists(false);
     }
@@ -337,10 +345,21 @@ export default function EditReunionPage() {
                         </FormItem>
                     )} />
                  </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField control={form.control} name="lieu" render={({ field }) => (
                         <FormItem><FormLabel>Lieu / Lien</FormLabel><FormControl><Input placeholder="Salle de réunion ou lien de la visio" {...field} /></FormControl><FormMessage /></FormItem>
                     )} />
+                    <FormField control={form.control} name="zone" render={({ field }) => (
+                        <FormItem><FormLabel>Zone / Unité</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                <SelectContent>{zones.map(item => <SelectItem key={item} value={item}>{item}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField control={form.control} name="animateur" render={({ field }) => (
                         <FormItem><FormLabel>Animateur</FormLabel><FormControl><Input placeholder="Nom de l'animateur" {...field} readOnly /></FormControl><FormMessage /></FormItem>
                     )} />

@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Edit, User, CalendarDays, Clock, MapPin, ClipboardList, Info, FileDown, Users as UsersIcon, Trash2, Loader2, Share2, Mail, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Edit, User, CalendarDays, Clock, MapPin, ClipboardList, Info, FileDown, Users as UsersIcon, Trash2, Loader2, Share2, Mail, MessageCircle, Building } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +41,7 @@ interface ReunionDetails {
   date: Timestamp;
   heure: string;
   lieu: string;
+  zone: string;
   animateur: string;
   duree: string;
   collaborateurs: string;
@@ -57,6 +58,7 @@ const demoReunion: ReunionDetails = {
     date: Timestamp.now(),
     heure: '10:00',
     lieu: 'Salle de conférence principale',
+    zone: 'Laminoir',
     animateur: 'Y. Alaoui (Démo)',
     duree: '90 minutes',
     collaborateurs: 'A. Saidi, F. Ziani, C. Petit',
@@ -291,6 +293,10 @@ L'équipe HSE SOMASTEEL`;
                             <div className="flex items-center gap-3">
                                 <MapPin className="h-5 w-5 text-muted-foreground" />
                                 <div><strong className="font-medium">Lieu / Lien:</strong> {reunion.lieu}</div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <Building className="h-5 w-5 text-muted-foreground" />
+                                <div><strong className="font-medium">Zone / Unité:</strong> {reunion.zone}</div>
                             </div>
                             <div className="flex items-center gap-3">
                                 <User className="h-5 w-5 text-muted-foreground" />
