@@ -9,7 +9,7 @@ import { db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ArrowLeft, Edit, User, Users, CalendarDays, MapPin, ClipboardList, AlertTriangle, ChevronsRight, Milestone, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Edit, User, Users, CalendarDays, MapPin, ClipboardList, AlertTriangle, ChevronsRight, Milestone, Trash2, Loader2, ListChecks } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -34,7 +34,7 @@ interface Anomaly {
     description: string;
     famille: string;
     criticite: "Mineure" | "Moyenne" | "Majeure" | "Critique";
-    actionsCorrectives: string;
+    actionsCorrectives?: { value: string }[];
     responsable: string;
     echeance?: Timestamp;
     avancement: "En cours" | "Réalisée" | "Non réalisée";
@@ -64,8 +64,8 @@ const demoCAA: CAADetails = {
     garant: 'F. Ziani (Démo)',
     participants: 'A. Saidi, C. Petit',
     anomalies: [
-        { description: "Point d'ancrage non vérifié avant utilisation.", famille: 'Travaux en hauteur', criticite: 'Majeure', actionsCorrectives: "Vérification systématique des points d'ancrage par le superviseur avant chaque utilisation.", responsable: 'A. Saidi', echeance: Timestamp.fromDate(new Date(new Date().setDate(new Date().getDate() + 7))), avancement: 'En cours' },
-        { description: 'Absence de balisage de la zone de travail au sol.', famille: 'Chute de plain-pied', criticite: 'Moyenne', actionsCorrectives: 'Mettre en place un balisage avec ruban de signalisation.', responsable: 'C. Petit', echeance: Timestamp.fromDate(new Date(new Date().setDate(new Date().getDate() + 2))), avancement: 'Réalisée' },
+        { description: "Point d'ancrage non vérifié avant utilisation.", famille: 'Travaux en hauteur', criticite: 'Majeure', actionsCorrectives: [{ value: "Vérification systématique des points d'ancrage par le superviseur avant chaque utilisation."}], responsable: 'A. Saidi', echeance: Timestamp.fromDate(new Date(new Date().setDate(new Date().getDate() + 7))), avancement: 'En cours' },
+        { description: 'Absence de balisage de la zone de travail au sol.', famille: 'Chute de plain-pied', criticite: 'Moyenne', actionsCorrectives: [{ value: 'Mettre en place un balisage avec ruban de signalisation.'}], responsable: 'C. Petit', echeance: Timestamp.fromDate(new Date(new Date().setDate(new Date().getDate() + 2))), avancement: 'Réalisée' },
     ],
     commentaires: 'La session a été constructive. Les participants ont été réceptifs aux points soulevés.',
     status: 'Ouverte'
@@ -302,10 +302,18 @@ export default function ChasseAuxAnomaliesDetailPage() {
                                     </div>
                                 </div>
                                 <Separator/>
-                                <h5 className="font-medium text-sm pt-2">Plan d'action</h5>
+                                <h5 className="font-medium text-sm pt-2 flex items-center gap-2"><ListChecks /> Plan d'action</h5>
                                 <div className="space-y-1 col-span-full">
                                     <p className="font-medium text-sm">Actions Correctives</p>
-                                    <p className="text-sm text-muted-foreground">{anomalie.actionsCorrectives || "N/A"}</p>
+                                     {anomalie.actionsCorrectives && anomalie.actionsCorrectives.length > 0 ? (
+                                        <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                                            {anomalie.actionsCorrectives.map((action, i) => (
+                                                <li key={i}>{action.value}</li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground italic">N/A</p>
+                                    )}
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-4 text-sm">
                                     <div className="space-y-1">

@@ -41,7 +41,7 @@ const chasseAuxAnomaliesSchema = z.object({
     description: z.string().min(1, "La description est requise."),
     famille: z.string().min(1, "La famille de risque est requise."),
     criticite: z.enum(["Mineure", "Moyenne", "Majeure", "Critique"], { required_error: "La criticité est requise." }),
-    actionsCorrectives: z.string().optional().default(''),
+    actionsCorrectives: z.array(z.object({ value: z.string().min(1, "L'action corrective ne peut être vide.") })).optional(),
     responsable: z.string().optional().default(''),
     echeance: z.date().optional(),
     avancement: z.enum(["En cours", "Réalisée", "Non réalisée"], { required_error: "Le statut d'avancement est requis." }),
@@ -50,6 +50,49 @@ const chasseAuxAnomaliesSchema = z.object({
 })
 
 type ChasseAuxAnomaliesFormValues = z.infer<typeof chasseAuxAnomaliesSchema>
+
+const CorrectiveActionsArray = ({ nestIndex, control }: { nestIndex: number; control: any }) => {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `anomalies.${nestIndex}.actionsCorrectives`,
+  });
+
+  return (
+    <div className="space-y-3 pl-4 border-l-2 ml-2 py-2">
+      <FormLabel>Actions correctives</FormLabel>
+      {fields.map((item, k) => (
+        <FormField
+          key={item.id}
+          control={control}
+          name={`anomalies.${nestIndex}.actionsCorrectives.${k}.value`}
+          render={({ field }) => (
+            <FormItem>
+              <div className="flex items-center gap-2">
+                <FormControl>
+                  <Textarea placeholder={`Action corrective n°${k + 1}`} {...field} rows={1} />
+                </FormControl>
+                <Button type="button" variant="ghost" size="icon" onClick={() => remove(k)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => append({ value: "" })}
+      >
+        <PlusCircle className="mr-2 h-4 w-4" />
+        Ajouter une action corrective
+      </Button>
+    </div>
+  );
+};
+
 
 const criticites = ["Mineure", "Moyenne", "Majeure", "Critique"];
 const statutsAvancement = ["En cours", "Réalisée", "Non réalisée"];
@@ -86,7 +129,7 @@ export default function NewChasseAuxAnomaliesPage() {
         famille: '',
         criticite: 'Moyenne',
         avancement: 'En cours', 
-        actionsCorrectives: '', 
+        actionsCorrectives: [], 
         responsable: '',
         echeance: undefined
       }],
@@ -330,11 +373,11 @@ export default function NewChasseAuxAnomaliesPage() {
                             <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                           </Button>
                         </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
                         <Calendar mode="single" selected={field.value} onSelect={(date) => {field.onChange(date); setIsDatePickerOpen(false);}} disabled={(date) => date > new Date() || date < new Date("1900-01-01")} initialFocus />
-                    </PopoverContent>
-                  </Popover>
+                      </PopoverContent>
+                    </Popover>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -457,9 +500,8 @@ export default function NewChasseAuxAnomaliesPage() {
                                 </FormItem>
                             )} />
                         </div>
-                         <FormField control={form.control} name={`anomalies.${index}.actionsCorrectives`} render={({ field }) => (
-                            <FormItem><FormLabel>Actions correctives</FormLabel><FormControl><Textarea placeholder="Quelles actions correctives sont prévues ?" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
+                         
+                        <CorrectiveActionsArray nestIndex={index} control={form.control} />
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FormField control={form.control} name={`anomalies.${index}.responsable`} render={({ field }) => (
@@ -506,7 +548,7 @@ export default function NewChasseAuxAnomaliesPage() {
                         </Button>
                     </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ description: '', famille: '', criticite: 'Moyenne', avancement: 'En cours', actionsCorrectives: '', responsable: '', echeance: undefined })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ description: '', famille: '', criticite: 'Moyenne', avancement: 'En cours', actionsCorrectives: [], responsable: '', echeance: undefined })}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Ajouter une anomalie
                 </Button>
@@ -546,5 +588,3 @@ export default function NewChasseAuxAnomaliesPage() {
     </div>
   )
 }
-
-    

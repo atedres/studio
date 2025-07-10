@@ -41,7 +41,7 @@ const chasseAuxAnomaliesSchema = z.object({
     description: z.string().min(1, "La description est requise."),
     famille: z.string().min(1, "La famille de risque est requise."),
     criticite: z.enum(["Mineure", "Moyenne", "Majeure", "Critique"], { required_error: "La criticité est requise." }),
-    actionsCorrectives: z.string().optional().default(''),
+    actionsCorrectives: z.array(z.object({ value: z.string().min(1, "L'action corrective ne peut être vide.") })).optional(),
     responsable: z.string().optional().default(''),
     echeance: z.date().optional(),
     avancement: z.enum(["En cours", "Réalisée", "Non réalisée"], { required_error: "Le statut d'avancement est requis." }),
@@ -50,6 +50,49 @@ const chasseAuxAnomaliesSchema = z.object({
 })
 
 type ChasseAuxAnomaliesFormValues = z.infer<typeof chasseAuxAnomaliesSchema>
+
+const CorrectiveActionsArray = ({ nestIndex, control }: { nestIndex: number; control: any }) => {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: `anomalies.${nestIndex}.actionsCorrectives`,
+  });
+
+  return (
+    <div className="space-y-3 pl-4 border-l-2 ml-2 py-2">
+      <FormLabel>Actions correctives</FormLabel>
+      {fields.map((item, k) => (
+        <FormField
+          key={item.id}
+          control={control}
+          name={`anomalies.${nestIndex}.actionsCorrectives.${k}.value`}
+          render={({ field }) => (
+            <FormItem>
+              <div className="flex items-center gap-2">
+                <FormControl>
+                  <Textarea placeholder={`Action corrective n°${k + 1}`} {...field} rows={1} />
+                </FormControl>
+                <Button type="button" variant="ghost" size="icon" onClick={() => remove(k)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => append({ value: "" })}
+      >
+        <PlusCircle className="mr-2 h-4 w-4" />
+        Ajouter une action corrective
+      </Button>
+    </div>
+  );
+};
+
 
 const criticites = ["Mineure", "Moyenne", "Majeure", "Critique"];
 const statutsAvancement = ["En cours", "Réalisée", "Non réalisée"];
@@ -63,8 +106,8 @@ const demoFormValues: ChasseAuxAnomaliesFormValues = {
     garant: 'F. Ziani (Démo)',
     participants: 'A. Saidi, C. Petit',
     anomalies: [
-        { description: "Point d'ancrage non vérifié avant utilisation.", famille: 'Travaux en hauteur', criticite: 'Majeure', actionsCorrectives: "Vérification systématique des points d'ancrage par le superviseur avant chaque utilisation.", responsable: 'A. Saidi', echeance: new Date(new Date().setDate(new Date().getDate() + 7)), avancement: 'En cours' },
-        { description: 'Absence de balisage de la zone de travail au sol.', famille: 'Chute de plain-pied', criticite: 'Moyenne', actionsCorrectives: 'Mettre en place un balisage avec ruban de signalisation.', responsable: 'C. Petit', echeance: new Date(new Date().setDate(new Date().getDate() + 2)), avancement: 'Réalisée' },
+        { description: "Point d'ancrage non vérifié avant utilisation.", famille: 'Travaux en hauteur', criticite: 'Majeure', actionsCorrectives: [{ value: "Vérification systématique des points d'ancrage par le superviseur avant chaque utilisation."}], responsable: 'A. Saidi', echeance: new Date(new Date().setDate(new Date().getDate() + 7)), avancement: 'En cours' },
+        { description: 'Absence de balisage de la zone de travail au sol.', famille: 'Chute de plain-pied', criticite: 'Moyenne', actionsCorrectives: [{ value: 'Mettre en place un balisage avec ruban de signalisation.'}], responsable: 'C. Petit', echeance: new Date(new Date().setDate(new Date().getDate() + 2)), avancement: 'Réalisée' },
     ],
     commentaires: 'La session a été constructive. Les participants ont été réceptifs aux points soulevés.'
 };
@@ -165,6 +208,7 @@ export default function EditChasseAuxAnomaliesPage() {
           anomalies: data.anomalies.map((anomalie: any) => ({
             ...anomalie,
             echeance: anomalie.echeance ? (anomalie.echeance as Timestamp).toDate() : undefined,
+            actionsCorrectives: anomalie.actionsCorrectives || [],
           })),
         };
         
@@ -463,9 +507,8 @@ export default function EditChasseAuxAnomaliesPage() {
                                 </FormItem>
                             )} />
                         </div>
-                         <FormField control={form.control} name={`anomalies.${index}.actionsCorrectives`} render={({ field }) => (
-                            <FormItem><FormLabel>Actions correctives</FormLabel><FormControl><Textarea placeholder="Quelles actions correctives sont prévues ?" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
+                         
+                        <CorrectiveActionsArray nestIndex={index} control={form.control} />
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FormField control={form.control} name={`anomalies.${index}.responsable`} render={({ field }) => (
@@ -512,7 +555,7 @@ export default function EditChasseAuxAnomaliesPage() {
                         </Button>
                     </div>
                 ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ description: '', famille: '', criticite: 'Moyenne', avancement: 'En cours', actionsCorrectives: '', responsable: '', echeance: undefined })}>
+                <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ description: '', famille: '', criticite: 'Moyenne', avancement: 'En cours', actionsCorrectives: [], responsable: '', echeance: undefined })}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Ajouter une anomalie
                 </Button>
@@ -548,5 +591,3 @@ export default function EditChasseAuxAnomaliesPage() {
     </div>
   )
 }
-
-    
