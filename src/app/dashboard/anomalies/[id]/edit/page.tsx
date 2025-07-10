@@ -20,12 +20,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, AlertTriangle } from "lucide-react"
+import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, AlertTriangle, Wand2, Check, RefreshCcw, Undo2, X } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { doc, getDoc, updateDoc, Timestamp, collection, getDocs, query, where } from "firebase/firestore"
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
 import { logActivity } from '@/lib/activityLogger'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { rewriteDescription } from '@/ai/flows/description-rewriter-flow'
+import { Badge } from '@/components/ui/badge'
 
 const chasseAuxAnomaliesSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -87,6 +89,9 @@ export default function EditChasseAuxAnomaliesPage() {
 
   const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
   const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
+
+  const [aiRewriteStates, setAiRewriteStates] = useState<Record<number, { isRewriting: boolean; originalText: string; suggestion: string }>>({});
+  const [participantInput, setParticipantInput] = useState('');
 
 
   const form = useForm<ChasseAuxAnomaliesFormValues>({
@@ -183,6 +188,67 @@ export default function EditChasseAuxAnomaliesPage() {
     name: "anomalies",
     control: form.control,
   })
+
+  const handleRewrite = async (index: number) => {
+    const currentDescription = form.getValues(`anomalies.${index}.description`);
+    if (!currentDescription) return;
+
+    setAiRewriteStates(prev => ({
+        ...prev,
+        [index]: { ...prev[index], isRewriting: true, originalText: currentDescription, suggestion: '' }
+    }));
+
+    try {
+        const rewrittenText = await rewriteDescription(currentDescription);
+        setAiRewriteStates(prev => ({
+            ...prev,
+            [index]: { ...prev[index], isRewriting: false, suggestion: rewrittenText }
+        }));
+        form.setValue(`anomalies.${index}.description`, rewrittenText);
+    } catch (error) {
+        console.error("Rewrite error:", error);
+        toast({ variant: "destructive", title: "Erreur IA", description: "La reformulation a échoué." });
+        setAiRewriteStates(prev => ({ ...prev, [index]: { ...prev[index], isRewriting: false } }));
+    }
+  };
+
+  const acceptSuggestion = (index: number) => {
+      setAiRewriteStates(prev => {
+          const newStates = { ...prev };
+          delete newStates[index];
+          return newStates;
+      });
+  };
+
+  const revertDescription = (index: number) => {
+      const originalText = aiRewriteStates[index]?.originalText;
+      if (originalText) {
+          form.setValue(`anomalies.${index}.description`, originalText);
+      }
+      acceptSuggestion(index); // This just clears the state
+  };
+
+  const handleParticipantInputChange = (newValue: string) => {
+    const selectedSuggestion = userNames.find(name => name === newValue);
+    if (selectedSuggestion) {
+        const currentParticipants = form.getValues("participants") || "";
+        const participantList = currentParticipants.split(',').map(p => p.trim()).filter(p => p);
+        if (!participantList.includes(selectedSuggestion)) {
+            form.setValue("participants", [...participantList, selectedSuggestion].join(', '), { shouldValidate: true });
+        }
+        setParticipantInput('');
+    } else {
+        setParticipantInput(newValue);
+    }
+  };
+
+  const handleRemoveParticipant = (nameToRemove: string) => {
+      const currentParticipants = form.getValues("participants");
+      const participantList = currentParticipants.split(',').map(p => p.trim()).filter(p => p);
+      const newParticipants = participantList.filter(p => p !== nameToRemove).join(', ');
+      form.setValue("participants", newParticipants, { shouldValidate: true });
+  };
+
 
   async function onSubmit(data: ChasseAuxAnomaliesFormValues) {
     if (isDemoMode) {
@@ -321,9 +387,30 @@ export default function EditChasseAuxAnomaliesPage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-              <FormField control={form.control} name="participants" render={({ field }) => (
-                  <FormItem className="lg:col-span-3"><FormLabel>Participants</FormLabel><FormControl><Textarea placeholder="Listez les noms des participants" {...field} /></FormControl><FormMessage /></FormItem>
-                )} />
+                <FormField control={form.control} name="participants" render={({ field }) => {
+                     const selectedParticipants = field.value ? field.value.split(',').map(p => p.trim()).filter(Boolean) : [];
+                     return (
+                      <FormItem className="lg:col-span-3">
+                        <FormLabel>Participants</FormLabel>
+                         <div className="rounded-md border min-h-[40px] p-2 flex flex-wrap gap-2">
+                            {selectedParticipants.length > 0 ? selectedParticipants.map(name => (
+                                <Badge key={name} variant="secondary" className="flex items-center gap-1">
+                                    {name}
+                                    <button type="button" onClick={() => handleRemoveParticipant(name)} className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                                        <X className="h-3 w-3" />
+                                    </button>
+                                </Badge>
+                            )) : <span className="text-sm text-muted-foreground px-1">Aucun participant ajouté.</span>}
+                        </div>
+                        <AutocompleteInput
+                            placeholder="Rechercher une personne à ajouter..."
+                            suggestions={userNames.filter(u => !selectedParticipants.includes(u))}
+                            value={participantInput}
+                            onChange={handleParticipantInputChange}
+                        />
+                        <FormMessage />
+                      </FormItem>
+                    )}} />
             </CardContent>
           </Card>
 
@@ -336,8 +423,27 @@ export default function EditChasseAuxAnomaliesPage() {
                 {anomaliesFields.map((field, index) => (
                     <div key={field.id} className="p-4 border rounded-lg space-y-4 relative">
                         <h4 className="font-semibold">Anomalie n°{index + 1}</h4>
-                        <FormField control={form.control} name={`anomalies.${index}.description`} render={({ field }) => (
-                           <FormItem><FormLabel>Description de l'anomalie</FormLabel><FormControl><Textarea placeholder="Décrivez précisément l'anomalie..." {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormField control={form.control} name={`anomalies.${index}.description`} render={({ field: descriptionField }) => (
+                           <FormItem>
+                            <FormLabel>Description de l'anomalie</FormLabel>
+                            <FormControl><Textarea placeholder="Décrivez précisément l'anomalie..." {...descriptionField} /></FormControl>
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                    <Button type="button" size="sm" variant="outline" onClick={() => handleRewrite(index)} disabled={aiRewriteStates[index]?.isRewriting || !descriptionField.value}>
+                                        {aiRewriteStates[index]?.isRewriting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                                        Reformuler
+                                    </Button>
+                                    {aiRewriteStates[index]?.suggestion && (
+                                        <>
+                                            <Button type="button" size="sm" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => acceptSuggestion(index)}><Check className="mr-2 h-4 w-4"/> Accepter</Button>
+                                            <Button type="button" size="sm" variant="ghost" onClick={() => handleRewrite(index)}><RefreshCcw className="mr-2 h-4 w-4"/> Réessayer</Button>
+                                            <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => revertDescription(index)}><Undo2 className="mr-2 h-4 w-4"/> Annuler</Button>
+                                        </>
+                                    )}
+                                </div>
+                                <FormMessage />
+                            </div>
+                           </FormItem>
                        )} />
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField control={form.control} name={`anomalies.${index}.famille`} render={({ field }) => (
@@ -442,3 +548,5 @@ export default function EditChasseAuxAnomaliesPage() {
     </div>
   )
 }
+
+    
