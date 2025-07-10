@@ -60,8 +60,19 @@ export default function SubmissionsPage() {
         }
 
         try {
-            const dsQuery = query(collection(db, "dialoguesSecurite"), where("zone", "==", user.entity), orderBy("createdAt", "desc"));
-            const caaQuery = query(collection(db, "chassesAuxAnomalies"), where("zone", "==", user.entity), orderBy("createdAt", "desc"));
+            const isFullAdmin = user.role === 'admin';
+            
+            const dsBaseQuery = collection(db, "dialoguesSecurite");
+            const caaBaseQuery = collection(db, "chassesAuxAnomalies");
+
+            const dsQuery = isFullAdmin 
+                ? query(dsBaseQuery, orderBy("createdAt", "desc")) 
+                : query(dsBaseQuery, where("zone", "==", user.entity), orderBy("createdAt", "desc"));
+                
+            const caaQuery = isFullAdmin
+                ? query(caaBaseQuery, orderBy("createdAt", "desc"))
+                : query(caaBaseQuery, where("zone", "==", user.entity), orderBy("createdAt", "desc"));
+
             
             const [dsSnapshot, caaSnapshot] = await Promise.all([getDocs(dsQuery), getDocs(caaQuery)]);
 
