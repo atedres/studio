@@ -41,9 +41,9 @@ const navItems = [
   { href: "/dashboard/anomalies", icon: AlertTriangle, label: "Chasse aux Anomalies / اصطياد الحالات الشاذة", roles: ['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
   { href: "/dashboard/actions", icon: ListChecks, label: "Plan d'Action / خطة العمل", roles: ['niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
   { href: "/dashboard/reunions", icon: Users, label: "Réunions SST / اجتماعات SST", roles: ['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
+  { href: "/dashboard/submissions", icon: Inbox, label: "Soumissions / التقديمات", roles: ['niveau3', 'niveau4', 'niveau5', 'admin'] },
   { href: "/dashboard/form-builder", icon: Wrench, label: "Générateur IA / منشئ AI", roles: ['niveau3', 'niveau4', 'niveau5', 'admin'] },
   { href: "/dashboard/templates", icon: Archive, label: "Modèles / النماذج", roles: ['niveau3', 'niveau4', 'niveau5', 'admin'] },
-  { href: "/dashboard/submissions", icon: Inbox, label: "Soumissions / التقديمات", roles: ['niveau3', 'niveau4', 'niveau5', 'admin'] },
   { href: "/dashboard/activity-log", icon: History, label: "Journal d'activité / سجل النشاط", roles: ['admin'] },
   { href: "/dashboard/settings", icon: Settings, label: "Paramètres / الإعدادات", roles: ['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
 ]
