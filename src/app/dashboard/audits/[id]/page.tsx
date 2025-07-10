@@ -33,7 +33,7 @@ interface Anomaly {
     type: "AD" | "IS" | "SD";
     description: string;
     familleRisque: string;
-    actionsImmediates: string;
+    actionsImmediates: { value: string }[];
     responsable: string;
     garant: string;
     echeance?: Timestamp;
@@ -70,7 +70,7 @@ const demoDS: DSDetails = {
     identification: 'M. Tazi',
     comportementsPositifs: [{ value: 'Port des EPI conforme' }, { value: "Maintien de l'ordre et de la propreté (5S)" }],
     anomalies: [
-        { type: 'AD', description: 'Vitesse excessive dans les virages.', familleRisque: 'Risque routier', actionsImmediates: "Rappel à l'ordre verbal de l'opérateur.", responsable: 'A. Saidi', garant: 'L. Bennani', statut: 'Réalisée' },
+        { type: 'AD', description: 'Vitesse excessive dans les virages.', familleRisque: 'Risque routier', actionsImmediates: [{ value: "Rappel à l'ordre verbal de l'opérateur." }], responsable: 'A. Saidi', garant: 'L. Bennani', statut: 'Réalisée' },
     ],
     commentaires: "L'opérateur a été réceptif et a reconnu son erreur. Un rappel général sera fait à l'équipe.",
     status: 'Validé',
@@ -373,7 +373,15 @@ export default function DialogueSecuriteDetailPage() {
                                 </div>
                                  <div className="space-y-1">
                                     <p className="font-medium">Actions Immédiates</p>
-                                    <p className="text-muted-foreground">{anomalie.actionsImmediates || "N/A"}</p>
+                                    {anomalie.actionsImmediates && anomalie.actionsImmediates.length > 0 ? (
+                                        <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+                                            {anomalie.actionsImmediates.map((action, i) => (
+                                                <li key={i}>{action.value}</li>
+                                            ))}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-sm text-muted-foreground italic">N/A</p>
+                                    )}
                                 </div>
                                 <hr className="md:col-span-2 my-2"/>
                                  <div className="space-y-1">
