@@ -50,49 +50,7 @@ const chasseAuxAnomaliesSchema = z.object({
 })
 
 type ChasseAuxAnomaliesFormValues = z.infer<typeof chasseAuxAnomaliesSchema>
-
-const CorrectiveActionsArray = ({ nestIndex, control }: { nestIndex: number; control: any }) => {
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: `anomalies.${nestIndex}.actionsCorrectives`,
-  });
-
-  return (
-    <div className="space-y-3 pl-4 border-l-2 ml-2 py-2">
-      <FormLabel>Actions correctives</FormLabel>
-      {fields.map((item, k) => (
-        <FormField
-          key={item.id}
-          control={control}
-          name={`anomalies.${nestIndex}.actionsCorrectives.${k}.value`}
-          render={({ field }) => (
-            <FormItem>
-              <div className="flex items-center gap-2">
-                <FormControl>
-                  <Textarea placeholder={`Action corrective n°${k + 1}`} {...field} rows={1} />
-                </FormControl>
-                <Button type="button" variant="ghost" size="icon" onClick={() => remove(k)}>
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-      ))}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        onClick={() => append({ value: "" })}
-      >
-        <PlusCircle className="mr-2 h-4 w-4" />
-        Ajouter une action corrective
-      </Button>
-    </div>
-  );
-};
-
+type AIRewriteState = { isRewriting: boolean; originalText: string; suggestion: string };
 
 const criticites = ["Mineure", "Moyenne", "Majeure", "Critique"];
 const statutsAvancement = ["En cours", "Réalisée", "Non réalisée"];
@@ -133,7 +91,7 @@ export default function EditChasseAuxAnomaliesPage() {
   const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
   const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
 
-  const [aiRewriteStates, setAiRewriteStates] = useState<Record<number, { isRewriting: boolean; originalText: string; suggestion: string }>>({});
+  const [aiRewriteStates, setAiRewriteStates] = useState<Record<string, AIRewriteState>>({});
   const [participantInput, setParticipantInput] = useState('');
 
 
@@ -142,6 +100,104 @@ export default function EditChasseAuxAnomaliesPage() {
     defaultValues: {},
   })
   
+  const handleRewrite = async (fieldId: string) => {
+    const currentText = form.getValues(fieldId as any);
+    if (!currentText) return;
+
+    setAiRewriteStates(prev => ({
+        ...prev,
+        [fieldId]: { isRewriting: true, originalText: currentText, suggestion: '' }
+    }));
+
+    try {
+        const rewrittenText = await rewriteDescription(currentText);
+        setAiRewriteStates(prev => ({
+            ...prev,
+            [fieldId]: { ...prev[fieldId], isRewriting: false, suggestion: rewrittenText }
+        }));
+        form.setValue(fieldId as any, rewrittenText, { shouldValidate: true });
+    } catch (error) {
+        console.error("Rewrite error:", error);
+        toast({ variant: "destructive", title: "Erreur IA", description: "La reformulation a échoué." });
+        setAiRewriteStates(prev => ({ ...prev, [fieldId]: { ...prev[fieldId], isRewriting: false } }));
+    }
+  };
+
+  const acceptSuggestion = (fieldId: string) => {
+      setAiRewriteStates(prev => {
+          const newStates = { ...prev };
+          delete newStates[fieldId];
+          return newStates;
+      });
+  };
+
+  const revertDescription = (fieldId: string) => {
+      const originalText = aiRewriteStates[fieldId]?.originalText;
+      if (originalText) {
+          form.setValue(fieldId as any, originalText, { shouldValidate: true });
+      }
+      acceptSuggestion(fieldId); // This just clears the state
+  };
+
+
+  const CorrectiveActionsArray = ({ nestIndex }: { nestIndex: number }) => {
+    const { fields, append, remove } = useFieldArray({
+      control: form.control,
+      name: `anomalies.${nestIndex}.actionsCorrectives`,
+    });
+  
+    return (
+      <div className="space-y-3 pl-4 border-l-2 ml-2 py-2">
+        <FormLabel>Actions correctives</FormLabel>
+        {fields.map((item, k) => {
+           const fieldId = `anomalies.${nestIndex}.actionsCorrectives.${k}.value`;
+           const aiState = aiRewriteStates[fieldId];
+
+           return (
+            <FormField
+              key={item.id}
+              control={form.control}
+              name={fieldId}
+              render={({ field }) => (
+                <FormItem>
+                   <div className="flex items-center gap-2">
+                    <Textarea placeholder={`Action corrective n°${k + 1}`} {...field} rows={1} />
+                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(k)}>
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                          <Button type="button" size="sm" variant="outline" onClick={() => handleRewrite(fieldId)} disabled={aiState?.isRewriting || !field.value}>
+                              {aiState?.isRewriting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                              Reformuler
+                          </Button>
+                          {aiState?.suggestion && (
+                              <>
+                                  <Button type="button" size="sm" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => acceptSuggestion(fieldId)}><Check className="mr-2 h-4 w-4"/> Accepter</Button>
+                                  <Button type="button" size="sm" variant="ghost" onClick={() => handleRewrite(fieldId)}><RefreshCcw className="mr-2 h-4 w-4"/> Réessayer</Button>
+                                  <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => revertDescription(fieldId)}><Undo2 className="mr-2 h-4 w-4"/> Annuler</Button>
+                              </>
+                          )}
+                      </div>
+                      <FormMessage />
+                  </div>
+                </FormItem>
+              )}
+            />
+        )})}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => append({ value: "" })}
+        >
+          <PlusCircle className="mr-2 h-4 w-4" />
+          Ajouter une action corrective
+        </Button>
+      </div>
+    );
+  };
     useEffect(() => {
         const fetchLists = async () => {
             setLoadingLists(true);
@@ -232,45 +288,6 @@ export default function EditChasseAuxAnomaliesPage() {
     name: "anomalies",
     control: form.control,
   })
-
-  const handleRewrite = async (index: number) => {
-    const currentDescription = form.getValues(`anomalies.${index}.description`);
-    if (!currentDescription) return;
-
-    setAiRewriteStates(prev => ({
-        ...prev,
-        [index]: { ...prev[index], isRewriting: true, originalText: currentDescription, suggestion: '' }
-    }));
-
-    try {
-        const rewrittenText = await rewriteDescription(currentDescription);
-        setAiRewriteStates(prev => ({
-            ...prev,
-            [index]: { ...prev[index], isRewriting: false, suggestion: rewrittenText }
-        }));
-        form.setValue(`anomalies.${index}.description`, rewrittenText);
-    } catch (error) {
-        console.error("Rewrite error:", error);
-        toast({ variant: "destructive", title: "Erreur IA", description: "La reformulation a échoué." });
-        setAiRewriteStates(prev => ({ ...prev, [index]: { ...prev[index], isRewriting: false } }));
-    }
-  };
-
-  const acceptSuggestion = (index: number) => {
-      setAiRewriteStates(prev => {
-          const newStates = { ...prev };
-          delete newStates[index];
-          return newStates;
-      });
-  };
-
-  const revertDescription = (index: number) => {
-      const originalText = aiRewriteStates[index]?.originalText;
-      if (originalText) {
-          form.setValue(`anomalies.${index}.description`, originalText);
-      }
-      acceptSuggestion(index); // This just clears the state
-  };
 
   const handleParticipantInputChange = (newValue: string) => {
     const selectedSuggestion = userNames.find(name => name === newValue);
@@ -464,24 +481,27 @@ export default function EditChasseAuxAnomaliesPage() {
               <CardDescription>Saisissez les écarts et les plans d'action associés.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                {anomaliesFields.map((field, index) => (
+                {anomaliesFields.map((field, index) => {
+                    const descFieldId = `anomalies.${index}.description`;
+                    const descAiState = aiRewriteStates[descFieldId];
+                    return (
                     <div key={field.id} className="p-4 border rounded-lg space-y-4 relative">
                         <h4 className="font-semibold">Anomalie n°{index + 1}</h4>
-                        <FormField control={form.control} name={`anomalies.${index}.description`} render={({ field: descriptionField }) => (
+                        <FormField control={form.control} name={descFieldId} render={({ field: descriptionField }) => (
                            <FormItem>
                             <FormLabel>Description de l'anomalie</FormLabel>
                             <FormControl><Textarea placeholder="Décrivez précisément l'anomalie..." {...descriptionField} /></FormControl>
                             <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex items-center gap-2">
-                                    <Button type="button" size="sm" variant="outline" onClick={() => handleRewrite(index)} disabled={aiRewriteStates[index]?.isRewriting || !descriptionField.value}>
-                                        {aiRewriteStates[index]?.isRewriting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                                    <Button type="button" size="sm" variant="outline" onClick={() => handleRewrite(descFieldId)} disabled={descAiState?.isRewriting || !descriptionField.value}>
+                                        {descAiState?.isRewriting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
                                         Reformuler
                                     </Button>
-                                    {aiRewriteStates[index]?.suggestion && (
+                                    {descAiState?.suggestion && (
                                         <>
-                                            <Button type="button" size="sm" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => acceptSuggestion(index)}><Check className="mr-2 h-4 w-4"/> Accepter</Button>
-                                            <Button type="button" size="sm" variant="ghost" onClick={() => handleRewrite(index)}><RefreshCcw className="mr-2 h-4 w-4"/> Réessayer</Button>
-                                            <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => revertDescription(index)}><Undo2 className="mr-2 h-4 w-4"/> Annuler</Button>
+                                            <Button type="button" size="sm" variant="ghost" className="text-green-600 hover:text-green-700" onClick={() => acceptSuggestion(descFieldId)}><Check className="mr-2 h-4 w-4"/> Accepter</Button>
+                                            <Button type="button" size="sm" variant="ghost" onClick={() => handleRewrite(descFieldId)}><RefreshCcw className="mr-2 h-4 w-4"/> Réessayer</Button>
+                                            <Button type="button" size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => revertDescription(descFieldId)}><Undo2 className="mr-2 h-4 w-4"/> Annuler</Button>
                                         </>
                                     )}
                                 </div>
@@ -508,7 +528,7 @@ export default function EditChasseAuxAnomaliesPage() {
                             )} />
                         </div>
                          
-                        <CorrectiveActionsArray nestIndex={index} control={form.control} />
+                        <CorrectiveActionsArray nestIndex={index} />
                         
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <FormField control={form.control} name={`anomalies.${index}.responsable`} render={({ field }) => (
@@ -554,7 +574,7 @@ export default function EditChasseAuxAnomaliesPage() {
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>
-                ))}
+                )})}
                 <Button type="button" variant="outline" size="sm" onClick={() => appendAnomalie({ description: '', famille: '', criticite: 'Moyenne', avancement: 'En cours', actionsCorrectives: [], responsable: '', echeance: undefined })}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Ajouter une anomalie
