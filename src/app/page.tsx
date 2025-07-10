@@ -22,11 +22,11 @@ import { useToast } from "@/hooks/use-toast"
 
 const Logo = () => (
     <Image
-      src="https://placehold.co/200x50.png"
-      width={140}
-      height={35}
+      src="/logo.png"
+      width={200}
+      height={50}
       alt="Somasteel Logo"
-      data-ai-hint="logo company"
+      className="h-auto"
     />
 );
 
