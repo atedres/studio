@@ -49,7 +49,7 @@ const navItems = [
 ]
 
 const Logo = () => (
-<svg width="200" height="50" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="grad1" x1="0%" y1="100%" x2="100%" y2="0%">
       <stop offset="0%" style={{stopColor:"#F58220",stopOpacity:1}} />
@@ -92,7 +92,7 @@ function ProtectedDashboardLayout({
   const NavContent = () => (
     <>
       <SidebarHeader>
-        <Link href="/dashboard" className="flex items-center gap-2.5">
+        <Link href="/dashboard" className="flex items-center gap-2.5 w-48">
           <Logo />
         </Link>
       </SidebarHeader>

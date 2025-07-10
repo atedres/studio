@@ -20,7 +20,7 @@ import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth'
 import { useToast } from "@/hooks/use-toast"
 
 const Logo = () => (
-<svg width="200" height="50" viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="grad1" x1="0%" y1="100%" x2="100%" y2="0%">
       <stop offset="0%" style={{stopColor:"#F58220",stopOpacity:1}} />
@@ -84,7 +84,7 @@ export default function LoginPage() {
       <div className="absolute inset-0 bg-grid-slate-50 [mask-image:linear-gradient(to_bottom,white_10%,transparent_90%)] dark:bg-grid-slate-900"></div>
       <Card className="w-full max-w-md z-10 shadow-2xl">
         <CardHeader className="text-center">
-          <div className="mx-auto w-fit mb-4">
+          <div className="mx-auto w-48 mb-4">
             <Logo />
           </div>
           <CardDescription className="font-headline">
