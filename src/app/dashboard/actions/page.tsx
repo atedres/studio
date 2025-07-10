@@ -275,7 +275,7 @@ export default function ActionPlanPage() {
                                         </Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <Button asChild variant="outline" size="icon" disabled={isDemoMode}>
+                                        <Button asChild variant="outline" size="icon">
                                             <Link href={getLinkHref(action)}>
                                                 <Eye className="h-4 w-4" />
                                                 <span className="sr-only">Voir la source</span>

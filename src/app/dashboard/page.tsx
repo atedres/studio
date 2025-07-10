@@ -472,7 +472,7 @@ export default function DashboardPage() {
                                 </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                                <Button asChild variant="outline" size="icon" disabled={isDemoMode}>
+                                <Button asChild variant="outline" size="icon">
                                     <Link href={isDemoMode ? '#' : `/dashboard/anomalies/${incident.id}`}>
                                         <Eye className="h-4 w-4" />
                                         <span className="sr-only">Voir</span>
