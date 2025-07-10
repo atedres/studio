@@ -2,6 +2,7 @@
 "use client"
 
 import Link from "next/link"
+import Image from "next/image"
 import {
   AlertTriangle,
   Archive,
@@ -49,18 +50,13 @@ const navItems = [
 ]
 
 const Logo = () => (
-<svg viewBox="0 0 200 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="grad1" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" style={{stopColor:"#F58220",stopOpacity:1}} />
-      <stop offset="100%" style={{stopColor:"#FFD200",stopOpacity:1}} />
-    </linearGradient>
-  </defs>
-  <path d="M42.33,26.12c-5.89-1.14-10.3-6.07-10.3-12.04c0-6.72,5.45-12.17,12.17-12.17c2.39,0,4.64,0.7,6.56,1.93c-2.43-1.63-5.38-2.63-8.56-2.63c-8.28,0-15,6.72-15,15c0,7.34,5.27,13.45,12.11,14.74L42.33,26.12z" fill="#E6E7E8"/>
-  <path d="M40.48,48.07c-2.43,1.63-5.38,2.63-8.56,2.63c-8.28,0-15-6.72-15-15c0-1.92,0.37-3.76,1.05-5.46c2.2,0.7,4.55,1.09,7.02,1.09c8.53,0,15.7-5.59,17.65-13.11c1.2,1.86,1.93,4.05,1.93,6.43c0,6.72-5.45,12.17-12.17,12.17c-2.39,0-4.64-0.7-6.56-1.93L40.48,48.07z" fill="url(#grad1)"/>
-  <text x="65" y="32" fontFamily="Arial, sans-serif" fontSize="24" fill="#808285" className="dark:fill-gray-300">Soma</text>
-  <text x="135" y="32" fontFamily="Arial, sans-serif" fontSize="24" fill="#F58220">Steel</text>
-</svg>
+    <Image
+      src="https://placehold.co/200x50.png"
+      width={140}
+      height={35}
+      alt="Somasteel Logo"
+      data-ai-hint="logo company"
+    />
 );
 
 
@@ -92,7 +88,7 @@ function ProtectedDashboardLayout({
   const NavContent = () => (
     <>
       <SidebarHeader>
-        <Link href="/dashboard" className="flex items-center gap-2.5 w-48">
+        <Link href="/dashboard" className="flex items-center gap-2.5">
           <Logo />
         </Link>
       </SidebarHeader>
