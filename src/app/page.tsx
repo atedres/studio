@@ -20,17 +20,6 @@ import { auth } from '@/lib/firebase'
 import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth'
 import { useToast } from "@/hooks/use-toast"
 
-const Logo = () => (
-    <Image
-      src="/logo.png"
-      width={200}
-      height={50}
-      alt="Somasteel Logo"
-      className="h-auto"
-    />
-);
-
-
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
@@ -79,12 +68,10 @@ export default function LoginPage() {
     <main className="flex min-h-screen flex-col items-center justify-center bg-background p-4">
       <div className="absolute inset-0 bg-grid-slate-50 [mask-image:linear-gradient(to_bottom,white_10%,transparent_90%)] dark:bg-grid-slate-900"></div>
       <Card className="w-full max-w-md z-10 shadow-2xl">
-        <CardHeader className="text-center flex flex-col items-center">
-          <div className="w-48 mb-4">
-            <Logo />
-          </div>
-          <CardDescription className="font-headline">
-            HSE Digital Platform / منصة HSE الرقمية
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl font-headline">HSE Digital Platform</CardTitle>
+          <CardDescription className="font-sans">
+            Connectez-vous à votre compte / تسجيل الدخول إلى حسابك
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>

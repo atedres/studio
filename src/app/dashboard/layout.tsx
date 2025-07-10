@@ -49,19 +49,6 @@ const navItems = [
   { href: "/dashboard/settings", icon: Settings, label: "Paramètres / الإعدادات", roles: ['niveau1', 'niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'] },
 ]
 
-const Logo = () => (
-  <div className="w-36">
-    <Image
-      src="/logo.png"
-      width={200}
-      height={50}
-      alt="Somasteel Logo"
-      className="h-auto w-full"
-    />
-  </div>
-);
-
-
 function ProtectedDashboardLayout({
   children,
 }: {
@@ -91,7 +78,7 @@ function ProtectedDashboardLayout({
     <>
       <SidebarHeader>
         <Link href="/dashboard" className="flex items-center gap-2.5">
-          <Logo />
+          <span className="font-bold font-headline text-lg">HSE Platform</span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
