@@ -57,12 +57,29 @@ interface DSDetails {
     status: string;
 }
 
+const demoDS: DSDetails = {
+    id: 'demo-ds-3',
+    date: Timestamp.now(),
+    observateur: 'L. Bennani (Démo)',
+    activite: 'Zone de stockage',
+    zone: 'Logistique',
+    poste: 'Allée 5',
+    nombrePersonnes: 2,
+    identification: 'Équipe logistique',
+    comportementsPositifs: [{ value: "Maintien de l'ordre et de la propreté (5S)" }],
+    anomalies: [
+        { type: 'IS', description: 'Zone de stockage encombrée, risque de chute.', familleRisque: 'Chute de plain-pied', actionsImmediates: "Dégagement de la zone.", responsable: 'L. Bennani', garant: 'F. Ziani', statut: 'En cours' },
+    ],
+    commentaires: "L'équipe a été coopérative pour ranger la zone immédiatement.",
+    status: 'En attente de validation',
+};
+
 export default function ValidateDialogueSecuritePage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
     const { toast } = useToast();
-    const { user } = useAuth();
+    const { user, isDemoMode } = useAuth();
 
     const [ds, setDs] = useState<DSDetails | null>(null);
     const [loading, setLoading] = useState(true);
@@ -76,6 +93,12 @@ export default function ValidateDialogueSecuritePage() {
     const canManage = user && ['niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
 
     useEffect(() => {
+        if (isDemoMode) {
+            setDs(demoDS);
+            setLoading(false);
+            return;
+        }
+
         if (!id) return;
         if (!canManage) {
             router.push(`/dashboard/audits/${id}`);
@@ -98,9 +121,21 @@ export default function ValidateDialogueSecuritePage() {
         };
 
         fetchDS();
-    }, [id, canManage, router, toast]);
+    }, [id, canManage, router, toast, isDemoMode]);
 
     const handleAction = async (action: 'validate' | 'reject' | 'requestCorrection') => {
+        if (isDemoMode) {
+            let message = "";
+            switch(action) {
+                case 'validate': message = "Dialogue validé (simulation)."; break;
+                case 'reject': message = "Dialogue rejeté (simulation)."; break;
+                case 'requestCorrection': message = "Demande de correction envoyée (simulation)."; break;
+            }
+            toast({ title: "Mode Démo", description: message });
+            router.push('/dashboard/audits');
+            return;
+        }
+        
         if (!user) return;
         setIsSubmitting(true);
         const docRef = doc(db, "dialoguesSecurite", id);

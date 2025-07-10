@@ -207,42 +207,58 @@ export default function DialoguesSecuritePage() {
   }, [user, isDemoMode]);
 
   const handleValidateClick = async (dialogue: Dialogue) => {
-    if (isSubmitting || isDemoMode) return;
-    setActiveDialogue(dialogue);
-    setIsSubmitting(true);
-    const docRef = doc(db, "dialoguesSecurite", dialogue.id);
-    try {
-        await updateDoc(docRef, {
-            status: "Validé",
-            validePar: user!.displayName || user!.email,
-            dateValidation: serverTimestamp(),
-        });
-        await logActivity(user, "Validation du Dialogue Sécurité", { docId: dialogue.id });
-        setAllDialogues(prev => prev.filter(d => d.id !== dialogue.id));
-        toast({ title: "Dialogue Validé", description: "Le dialogue de sécurité a été approuvé." });
-    } catch (error) {
-        console.error("Error validating document: ", error);
-        toast({ variant: "destructive", title: "Erreur", description: "Une erreur est survenue." });
-    } finally {
-        setIsSubmitting(false);
-        setActiveDialogue(null);
-    }
+      if (isSubmitting) return;
+      
+      if (isDemoMode) {
+        toast({ title: "Mode Démo", description: "Le dialogue a été marqué comme validé." });
+        setAllDialogues(prev => prev.map(d => d.id === dialogue.id ? {...d, status: 'Validé'} : d));
+        return;
+      }
+
+      setActiveDialogue(dialogue);
+      setIsSubmitting(true);
+      const docRef = doc(db, "dialoguesSecurite", dialogue.id);
+      try {
+          await updateDoc(docRef, {
+              status: "Validé",
+              validePar: user!.displayName || user!.email,
+              dateValidation: serverTimestamp(),
+          });
+          await logActivity(user, "Validation du Dialogue Sécurité", { docId: dialogue.id });
+          setAllDialogues(prev => prev.filter(d => d.id !== dialogue.id));
+          toast({ title: "Dialogue Validé", description: "Le dialogue de sécurité a été approuvé." });
+      } catch (error) {
+          console.error("Error validating document: ", error);
+          toast({ variant: "destructive", title: "Erreur", description: "Une erreur est survenue." });
+      } finally {
+          setIsSubmitting(false);
+          setActiveDialogue(null);
+      }
   };
 
   const handleCorrectionClick = (dialogue: Dialogue) => {
-      if (isDemoMode) return;
       setActiveDialogue(dialogue);
       setIsCorrectionDialogOpen(true);
   };
   
   const handleRejectClick = (dialogue: Dialogue) => {
-      if (isDemoMode) return;
       setActiveDialogue(dialogue);
       setIsRejectDialogOpen(true);
   };
 
   const handleDialogSubmit = async (action: 'reject' | 'requestCorrection') => {
-      if (!user || !activeDialogue || isDemoMode) return;
+      if (!user || !activeDialogue) return;
+
+      if (isDemoMode) {
+          const newStatus = action === 'reject' ? 'Rejeté' : 'À corriger';
+          toast({ title: "Mode Démo", description: `Le dialogue a été marqué comme "${newStatus}".` });
+          setAllDialogues(prev => prev.map(d => d.id === activeDialogue.id ? {...d, status: newStatus} : d));
+          setIsRejectDialogOpen(false);
+          setIsCorrectionDialogOpen(false);
+          setActiveDialogue(null);
+          return;
+      }
+
       setIsSubmitting(true);
       const docRef = doc(db, "dialoguesSecurite", activeDialogue.id);
       
@@ -336,8 +352,10 @@ export default function DialoguesSecuritePage() {
   
   const getLinkHref = (dialogue: Dialogue) => {
     if (isDemoMode) {
+      if (dialogue.status === 'En attente de validation') return `/dashboard/audits/${dialogue.id}/validate`;
       return dialogue.status === 'Brouillon' || dialogue.status === 'À corriger' ? `/dashboard/audits/${dialogue.id}/edit` : `/dashboard/audits/${dialogue.id}`;
     }
+    if (dialogue.status === 'En attente de validation' && canManage) return `/dashboard/audits/${dialogue.id}/validate`;
     return dialogue.status === 'Brouillon' || dialogue.status === 'À corriger' ? `/dashboard/audits/${dialogue.id}/edit` : `/dashboard/audits/${dialogue.id}`;
   }
 
@@ -393,7 +411,7 @@ export default function DialoguesSecuritePage() {
                 {dialogue.status === 'En attente de validation' && canManage ? (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0" disabled={(isSubmitting && activeDialogue?.id === dialogue.id) || isDemoMode}>
+                            <Button variant="ghost" className="h-8 w-8 p-0" disabled={(isSubmitting && activeDialogue?.id === dialogue.id)}>
                                 <span className="sr-only">Ouvrir le menu</span>
                                 {isSubmitting && activeDialogue?.id === dialogue.id ? <Loader2 className="h-4 w-4 animate-spin"/> : <MoreHorizontal className="h-4 w-4" />}
                             </Button>
@@ -410,7 +428,7 @@ export default function DialoguesSecuritePage() {
                                 <X className="mr-2 h-4 w-4" /> Rejeter
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <Link href={`/dashboard/audits/${dialogue.id}`} passHref>
+                            <Link href={getLinkHref(dialogue)} passHref>
                                 <DropdownMenuItem>
                                     <Eye className="mr-2 h-4 w-4" /> Voir les détails
                                 </DropdownMenuItem>
