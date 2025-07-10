@@ -473,7 +473,7 @@ export default function DashboardPage() {
                             </TableCell>
                             <TableCell className="text-right">
                                 <Button asChild variant="outline" size="icon">
-                                    <Link href={isDemoMode ? '#' : `/dashboard/anomalies/${incident.id}`}>
+                                    <Link href={`/dashboard/anomalies/${incident.id}`}>
                                         <Eye className="h-4 w-4" />
                                         <span className="sr-only">Voir</span>
                                     </Link>
