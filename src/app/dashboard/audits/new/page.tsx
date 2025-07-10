@@ -19,13 +19,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, Check, MessageCircle, Wand2, RefreshCcw, Undo2, AlertTriangle } from "lucide-react"
+import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, Check, MessageCircle, Wand2, RefreshCcw, Undo2, AlertTriangle, X } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore"
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
 import { logActivity } from '@/lib/activityLogger'
 import { rewriteDescription } from '@/ai/flows/description-rewriter-flow'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 
 const dialogueSecuriteSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -126,6 +127,8 @@ export default function NewDialogueSecuritePage() {
   
   const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
   const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
+  
+  const [participantInput, setParticipantInput] = useState('');
 
   const [customBP, setCustomBP] = useState<Record<number, boolean>>({});
   const [aiRewriteStates, setAiRewriteStates] = useState<Record<number, { isRewriting: boolean; originalText: string; suggestion: string }>>({});
@@ -332,6 +335,27 @@ export default function NewDialogueSecuritePage() {
     }
   }
   
+  const handleParticipantInputChange = (newValue: string) => {
+    const selectedSuggestion = userNames.find(name => name === newValue);
+    if (selectedSuggestion) {
+        const currentParticipants = form.getValues("identification") || "";
+        const participantList = currentParticipants.split(',').map(p => p.trim()).filter(p => p);
+        if (!participantList.includes(selectedSuggestion)) {
+            form.setValue("identification", [...participantList, selectedSuggestion].join(', '), { shouldValidate: true });
+        }
+        setParticipantInput('');
+    } else {
+        setParticipantInput(newValue);
+    }
+  };
+
+  const handleRemoveParticipant = (nameToRemove: string) => {
+      const currentParticipants = form.getValues("identification");
+      const participantList = currentParticipants.split(',').map(p => p.trim()).filter(p => p);
+      const newParticipants = participantList.filter(p => p !== nameToRemove).join(', ');
+      form.setValue("identification", newParticipants, { shouldValidate: true });
+  };
+  
   const whatsAppMessage = useMemo(() => {
     const message = `Bonjour, je vous informe que j'ai rédigé un nouveau Dialogue de Sécurité qui est en attente de votre validation. Cordialement, ${user?.displayName || 'un collaborateur'}.`;
     return encodeURIComponent(message);
@@ -470,20 +494,30 @@ export default function NewDialogueSecuritePage() {
                     <FormMessage />
                   </FormItem>
                 )} />
-              <FormField control={form.control} name="identification" render={({ field }) => (
+              <FormField control={form.control} name="identification" render={({ field }) => {
+                 const selectedParticipants = field.value ? field.value.split(',').map(p => p.trim()).filter(Boolean) : [];
+                 return (
                   <FormItem className="lg:col-span-3">
                     <FormLabel>Identification (Nom ou matricule)</FormLabel>
-                    <FormControl>
-                        <AutocompleteInput
-                          placeholder="Nom ou matricule de la personne observée"
-                          suggestions={userNames}
-                          value={field.value}
-                          onChange={field.onChange}
-                       />
-                    </FormControl>
+                     <div className="rounded-md border min-h-[40px] p-2 flex flex-wrap gap-2">
+                        {selectedParticipants.length > 0 ? selectedParticipants.map(name => (
+                            <Badge key={name} variant="secondary" className="flex items-center gap-1">
+                                {name}
+                                <button type="button" onClick={() => handleRemoveParticipant(name)} className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                                    <X className="h-3 w-3" />
+                                </button>
+                            </Badge>
+                        )) : <span className="text-sm text-muted-foreground px-1">Aucun participant ajouté.</span>}
+                    </div>
+                    <AutocompleteInput
+                        placeholder="Rechercher une personne à ajouter..."
+                        suggestions={userNames.filter(u => !selectedParticipants.includes(u))}
+                        value={participantInput}
+                        onChange={handleParticipantInputChange}
+                    />
                     <FormMessage />
                   </FormItem>
-                )} />
+                )}} />
             </CardContent>
           </Card>
 
@@ -698,3 +732,5 @@ export default function NewDialogueSecuritePage() {
     </div>
   )
 }
+
+    

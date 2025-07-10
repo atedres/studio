@@ -20,12 +20,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, Wand2, Check, RefreshCcw, Undo2 } from "lucide-react"
+import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, Wand2, Check, RefreshCcw, Undo2, X } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { doc, getDoc, updateDoc, Timestamp, collection, getDocs, query, where } from "firebase/firestore"
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
 import { logActivity } from '@/lib/activityLogger'
 import { rewriteDescription } from '@/ai/flows/description-rewriter-flow'
+import { Badge } from '@/components/ui/badge'
 
 const dialogueSecuriteSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -129,6 +130,8 @@ export default function EditDialogueSecuritePage() {
 
     const [users, setUsers] = useState<{ id: string, displayName: string }[]>([]);
     const userNames = React.useMemo(() => users.map(u => u.displayName), [users]);
+    
+    const [participantInput, setParticipantInput] = useState('');
     
     const [customBP, setCustomBP] = useState<Record<number, boolean>>({});
     const [aiRewriteStates, setAiRewriteStates] = useState<Record<number, { isRewriting: boolean; originalText: string; suggestion: string }>>({});
@@ -251,6 +254,27 @@ export default function EditDialogueSecuritePage() {
         name: "anomalies",
         control: form.control,
     })
+    
+     const handleParticipantInputChange = (newValue: string) => {
+        const selectedSuggestion = userNames.find(name => name === newValue);
+        if (selectedSuggestion) {
+            const currentParticipants = form.getValues("identification") || "";
+            const participantList = currentParticipants.split(',').map(p => p.trim()).filter(p => p);
+            if (!participantList.includes(selectedSuggestion)) {
+                form.setValue("identification", [...participantList, selectedSuggestion].join(', '), { shouldValidate: true });
+            }
+            setParticipantInput('');
+        } else {
+            setParticipantInput(newValue);
+        }
+      };
+
+      const handleRemoveParticipant = (nameToRemove: string) => {
+          const currentParticipants = form.getValues("identification");
+          const participantList = currentParticipants.split(',').map(p => p.trim()).filter(p => p);
+          const newParticipants = participantList.filter(p => p !== nameToRemove).join(', ');
+          form.setValue("identification", newParticipants, { shouldValidate: true });
+      };
 
     const handleRewrite = async (index: number) => {
         const currentDescription = form.getValues(`anomalies.${index}.description`);
@@ -408,19 +432,30 @@ export default function EditDialogueSecuritePage() {
                             <FormField control={form.control} name="nombrePersonnes" render={({ field }) => (
                                 <FormItem><FormLabel>Nombre de personnes</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
                             )} />
-                            <FormField control={form.control} name="identification" render={({ field }) => (
-                                 <FormItem className="lg:col-span-3"><FormLabel>Identification (Nom ou matricule)</FormLabel>
-                                    <FormControl>
-                                        <AutocompleteInput
-                                          placeholder="Nom ou matricule de la personne observée"
-                                          suggestions={userNames}
-                                          value={field.value}
-                                          onChange={field.onChange}
-                                       />
-                                    </FormControl>
+                            <FormField control={form.control} name="identification" render={({ field }) => {
+                                const selectedParticipants = field.value ? field.value.split(',').map(p => p.trim()).filter(Boolean) : [];
+                                return (
+                                 <FormItem className="lg:col-span-3">
+                                    <FormLabel>Identification (Nom ou matricule)</FormLabel>
+                                     <div className="rounded-md border min-h-[40px] p-2 flex flex-wrap gap-2">
+                                        {selectedParticipants.length > 0 ? selectedParticipants.map(name => (
+                                            <Badge key={name} variant="secondary" className="flex items-center gap-1">
+                                                {name}
+                                                <button type="button" onClick={() => handleRemoveParticipant(name)} className="ml-1 rounded-full outline-none ring-offset-background focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </Badge>
+                                        )) : <span className="text-sm text-muted-foreground px-1">Aucun participant ajouté.</span>}
+                                    </div>
+                                    <AutocompleteInput
+                                        placeholder="Rechercher une personne à ajouter..."
+                                        suggestions={userNames.filter(u => !selectedParticipants.includes(u))}
+                                        value={participantInput}
+                                        onChange={handleParticipantInputChange}
+                                    />
                                     <FormMessage />
                                   </FormItem>
-                            )} />
+                                )}} />
                         </CardContent>
                     </Card>
 
@@ -476,7 +511,7 @@ export default function EditDialogueSecuritePage() {
                                         }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="AD">Acte Dangereux (AD)</SelectItem><SelectItem value="IS">Situation Dangereuse (IS)</SelectItem><SelectItem value="SD">Système Défaillant (SD)</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
                                         <FormField control={form.control} name={`anomalies.${index}.familleRisque`} render={({ field }) => (<FormItem><FormLabel>Famille de risque</FormLabel>
                                             <Select onValueChange={field.onChange} value={field.value}>
-                                                <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder={loadingLists ? "Chargement..." : "Sélectionner..."} /></SelectTrigger></FormControl>
+                                                <FormControl><SelectTrigger disabled={loadingLists}><SelectValue placeholder="Sélectionner..." /></SelectTrigger></FormControl>
                                                 <SelectContent>{filteredFamilles.map(famille => <SelectItem key={famille.id} value={famille.nom}>{famille.nom}</SelectItem>)}</SelectContent>
                                             </Select>
                                             <FormMessage />
@@ -576,3 +611,5 @@ export default function EditDialogueSecuritePage() {
         </div>
     )
 }
+
+    
