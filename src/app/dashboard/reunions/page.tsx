@@ -170,7 +170,7 @@ export default function ReunionsPage() {
   )
   
   const getLinkHref = (reunion: Reunion) => {
-    if (isDemoMode) return "#";
+    if (isDemoMode) return `/dashboard/reunions/${reunion.id}`;
     return `/dashboard/reunions/${reunion.id}`;
   }
 
@@ -224,8 +224,8 @@ export default function ReunionsPage() {
                       <CardDescription>Liste de toutes les réunions planifiées et passées.</CardDescription>
                   </div>
                   {canManage && (
-                    <Button asChild className="bg-accent hover:bg-accent/90" disabled={isDemoMode}>
-                      <Link href={isDemoMode ? "#" : "/dashboard/reunions/new"}>
+                    <Button asChild className="bg-accent hover:bg-accent/90">
+                      <Link href="/dashboard/reunions/new">
                         <PlusCircle className="mr-2 h-4 w-4" />
                         Programmer une réunion
                       </Link>
@@ -255,7 +255,7 @@ export default function ReunionsPage() {
                                     <Badge variant={getStatusVariant(reunion.status) as any}>{reunion.status}</Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <Button asChild variant="outline" size="icon" disabled={isDemoMode}>
+                                    <Button asChild variant="outline" size="icon">
                                         <Link href={getLinkHref(reunion)}>
                                             <Eye className="h-4 w-4" />
                                             <span className="sr-only">Voir</span>
@@ -297,5 +297,3 @@ export default function ReunionsPage() {
     </div>
   )
 }
-
-    

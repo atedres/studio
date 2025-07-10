@@ -220,7 +220,9 @@ export default function AnomaliesPage() {
   )
 
   const getLinkHref = (caa: CAA) => {
-    if (isDemoMode) return '#';
+    if (isDemoMode) {
+      return caa.status === 'Brouillon' ? `/dashboard/anomalies/${caa.id}/edit` : `/dashboard/anomalies/${caa.id}`;
+    }
     return caa.status === 'Brouillon' ? `/dashboard/anomalies/${caa.id}/edit` : `/dashboard/anomalies/${caa.id}`;
   }
 
@@ -305,7 +307,7 @@ export default function AnomaliesPage() {
                             <TableCell className="text-center">{caa.anomalies.length}</TableCell>
                             <TableCell><Badge variant={getStatusVariant(caa.status) as any}>{caa.status}</Badge></TableCell>
                              <TableCell className="text-right">
-                                <Button asChild variant="outline" size="icon" disabled={isDemoMode}>
+                                <Button asChild variant="outline" size="icon">
                                     <Link href={getLinkHref(caa)}>
                                         <Eye className="h-4 w-4" />
                                         <span className="sr-only">{caa.status === 'Brouillon' ? 'Modifier' : 'Voir'}</span>
@@ -338,8 +340,8 @@ export default function AnomaliesPage() {
         </Card>
       </div>
         <div className="fixed bottom-8 right-8">
-            <Button asChild size="lg" className="rounded-full h-16 w-16 shadow-lg bg-accent hover:bg-accent/90" disabled={isDemoMode}>
-                <Link href={isDemoMode ? "#" : "/dashboard/anomalies/new"}>
+            <Button asChild size="lg" className="rounded-full h-16 w-16 shadow-lg bg-accent hover:bg-accent/90">
+                <Link href="/dashboard/anomalies/new">
                     <FilePlus2 className="h-8 w-8" />
                     <span className="sr-only">Ajouter une CAA</span>
                 </Link>
@@ -348,5 +350,3 @@ export default function AnomaliesPage() {
     </div>
   )
 }
-
-    

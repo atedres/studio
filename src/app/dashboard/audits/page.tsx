@@ -335,7 +335,9 @@ export default function DialoguesSecuritePage() {
   )
   
   const getLinkHref = (dialogue: Dialogue) => {
-    if (isDemoMode) return "#";
+    if (isDemoMode) {
+      return dialogue.status === 'Brouillon' || dialogue.status === 'À corriger' ? `/dashboard/audits/${dialogue.id}/edit` : `/dashboard/audits/${dialogue.id}`;
+    }
     return dialogue.status === 'Brouillon' || dialogue.status === 'À corriger' ? `/dashboard/audits/${dialogue.id}/edit` : `/dashboard/audits/${dialogue.id}`;
   }
 
@@ -416,7 +418,7 @@ export default function DialoguesSecuritePage() {
                         </DropdownMenuContent>
                     </DropdownMenu>
                 ) : (
-                    <Button asChild variant="outline" size="sm" disabled={isDemoMode}>
+                    <Button asChild variant="outline" size="sm">
                         <Link href={getLinkHref(dialogue)}>
                             <Eye className="mr-2 h-4 w-4" /> {dialogue.status === 'Brouillon' || dialogue.status === 'À corriger' ? 'Modifier' : 'Voir'}
                         </Link>
@@ -546,8 +548,8 @@ export default function DialoguesSecuritePage() {
       </div>
 
        <div className="fixed bottom-8 right-8">
-            <Button asChild size="lg" className="rounded-full h-16 w-16 shadow-lg bg-accent hover:bg-accent/90" disabled={isDemoMode}>
-                <Link href={isDemoMode ? "#" : "/dashboard/audits/new"}>
+            <Button asChild size="lg" className="rounded-full h-16 w-16 shadow-lg bg-accent hover:bg-accent/90">
+                <Link href="/dashboard/audits/new">
                     <FilePlus2 className="h-8 w-8" />
                     <span className="sr-only">Ajouter un DS</span>
                 </Link>
@@ -601,5 +603,3 @@ export default function DialoguesSecuritePage() {
     </TooltipProvider>
   )
 }
-
-    
