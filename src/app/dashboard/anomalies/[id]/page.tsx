@@ -54,13 +54,30 @@ interface CAADetails {
     status: string;
 }
 
+const demoCAA: CAADetails = {
+    id: 'demo-caa-1',
+    date: Timestamp.now(),
+    activite: 'Travail en hauteur',
+    zone: 'Laminoir',
+    poste: 'Pont roulant 3',
+    animateur: 'Y. Alaoui (Démo)',
+    garant: 'F. Ziani (Démo)',
+    participants: 'A. Saidi, C. Petit',
+    anomalies: [
+        { description: "Point d'ancrage non vérifié avant utilisation.", famille: 'Travaux en hauteur', criticite: 'Majeure', actionsCorrectives: "Vérification systématique des points d'ancrage par le superviseur avant chaque utilisation.", responsable: 'A. Saidi', echeance: Timestamp.fromDate(new Date(new Date().setDate(new Date().getDate() + 7))), avancement: 'En cours' },
+        { description: 'Absence de balisage de la zone de travail au sol.', famille: 'Chute de plain-pied', criticite: 'Moyenne', actionsCorrectives: 'Mettre en place un balisage avec ruban de signalisation.', responsable: 'C. Petit', echeance: Timestamp.fromDate(new Date(new Date().setDate(new Date().getDate() + 2))), avancement: 'Réalisée' },
+    ],
+    commentaires: 'La session a été constructive. Les participants ont été réceptifs aux points soulevés.',
+    status: 'Ouverte'
+};
+
 
 export default function ChasseAuxAnomaliesDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
     const { toast } = useToast();
-    const { user } = useAuth();
+    const { user, isDemoMode } = useAuth();
 
     const [caa, setCaa] = useState<CAADetails | null>(null);
     const [loading, setLoading] = useState(true);
@@ -70,6 +87,11 @@ export default function ChasseAuxAnomaliesDetailPage() {
 
 
     useEffect(() => {
+        if (isDemoMode) {
+            setCaa(demoCAA);
+            setLoading(false);
+            return;
+        }
         if (!id) return;
 
         const fetchCAA = async () => {
@@ -87,9 +109,14 @@ export default function ChasseAuxAnomaliesDetailPage() {
         };
 
         fetchCAA();
-    }, [id]);
+    }, [id, isDemoMode]);
 
     const handleDelete = async () => {
+        if (isDemoMode) {
+            toast({ title: "Mode Démo", description: "La suppression est désactivée en mode démo." });
+            router.push('/dashboard/anomalies');
+            return;
+        }
         setIsDeleting(true);
         try {
             const docRef = doc(db, 'chassesAuxAnomalies', id);

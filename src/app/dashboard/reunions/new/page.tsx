@@ -19,7 +19,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, ArrowLeft, Loader2, X } from "lucide-react"
+import { Calendar as CalendarIcon, ArrowLeft, Loader2, X, AlertTriangle } from "lucide-react"
 import { db, storage } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, getDocs } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
@@ -28,6 +28,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 
 const reunionSchema = z.object({
@@ -49,7 +50,7 @@ const durations = ["15 minutes", "30 minutes", "45 minutes", "60 minutes", "90 m
 
 export default function NewReunionPage() {
   const { toast } = useToast()
-  const { user } = useAuth()
+  const { user, isDemoMode } = useAuth()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false)
@@ -90,8 +91,12 @@ export default function NewReunionPage() {
             setLoadingLists(false);
         }
     };
-    fetchUsers();
-  }, [toast]);
+    if (!isDemoMode) {
+      fetchUsers();
+    } else {
+      setLoadingLists(false);
+    }
+  }, [toast, isDemoMode]);
   
   const handleParticipantInputChange = (newValue: string) => {
     const selectedSuggestion = userNames.find(name => name === newValue);
@@ -116,6 +121,10 @@ export default function NewReunionPage() {
 
 
   async function onSubmit(data: ReunionFormValues) {
+    if (isDemoMode) {
+        toast({ title: "Mode Démo", description: "La création est désactivée en mode démo." });
+        return;
+    }
     if (!user) {
         toast({
             variant: "destructive",
@@ -190,6 +199,15 @@ export default function NewReunionPage() {
             </p>
         </div>
       </div>
+       {isDemoMode && (
+          <Alert variant="default" className="bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            <AlertTitle className="text-yellow-800 dark:text-yellow-300">Mode Démonstration</AlertTitle>
+            <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+              Vous êtes en mode démo. Les réunions ne peuvent pas être sauvegardées.
+            </AlertDescription>
+          </Alert>
+      )}
       
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -318,8 +336,8 @@ export default function NewReunionPage() {
           </Card>
 
           <div className="flex justify-end">
-            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || isDemoMode}>
+              {isSubmitting && !isDemoMode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Soumettre
             </Button>
           </div>

@@ -25,6 +25,7 @@ import { db } from "@/lib/firebase"
 import { doc, getDoc, updateDoc, Timestamp, collection, getDocs, query, where } from "firebase/firestore"
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
 import { logActivity } from '@/lib/activityLogger'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const chasseAuxAnomaliesSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -51,12 +52,27 @@ type ChasseAuxAnomaliesFormValues = z.infer<typeof chasseAuxAnomaliesSchema>
 const criticites = ["Mineure", "Moyenne", "Majeure", "Critique"];
 const statutsAvancement = ["En cours", "Réalisée", "Non réalisée"];
 
+const demoFormValues: ChasseAuxAnomaliesFormValues = {
+    date: new Date(),
+    activite: 'Travail en hauteur',
+    zone: 'Laminoir',
+    poste: 'Pont roulant 3',
+    animateur: 'Y. Alaoui (Démo)',
+    garant: 'F. Ziani (Démo)',
+    participants: 'A. Saidi, C. Petit',
+    anomalies: [
+        { description: "Point d'ancrage non vérifié avant utilisation.", famille: 'Travaux en hauteur', criticite: 'Majeure', actionsCorrectives: "Vérification systématique des points d'ancrage par le superviseur avant chaque utilisation.", responsable: 'A. Saidi', echeance: new Date(new Date().setDate(new Date().getDate() + 7)), avancement: 'En cours' },
+        { description: 'Absence de balisage de la zone de travail au sol.', famille: 'Chute de plain-pied', criticite: 'Moyenne', actionsCorrectives: 'Mettre en place un balisage avec ruban de signalisation.', responsable: 'C. Petit', echeance: new Date(new Date().setDate(new Date().getDate() + 2)), avancement: 'Réalisée' },
+    ],
+    commentaires: 'La session a été constructive. Les participants ont été réceptifs aux points soulevés.'
+};
+
 export default function EditChasseAuxAnomaliesPage() {
   const { toast } = useToast()
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
-  const { user } = useAuth();
+  const { user, isDemoMode } = useAuth();
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -115,10 +131,19 @@ export default function EditChasseAuxAnomaliesPage() {
             }
         };
 
-        fetchLists();
-    }, [toast]);
+        if (!isDemoMode) {
+            fetchLists();
+        } else {
+            setLoadingLists(false);
+        }
+    }, [toast, isDemoMode]);
 
   useEffect(() => {
+    if (isDemoMode) {
+        form.reset(demoFormValues);
+        setLoading(false);
+        return;
+    }
     if (!id) return;
 
     const fetchAndSetCAA = async () => {
@@ -151,7 +176,7 @@ export default function EditChasseAuxAnomaliesPage() {
     };
 
     fetchAndSetCAA();
-  }, [id, form, router, toast]);
+  }, [id, form, router, toast, isDemoMode]);
 
 
   const { fields: anomaliesFields, append: appendAnomalie, remove: removeAnomalie } = useFieldArray({
@@ -160,6 +185,11 @@ export default function EditChasseAuxAnomaliesPage() {
   })
 
   async function onSubmit(data: ChasseAuxAnomaliesFormValues) {
+    if (isDemoMode) {
+        toast({ title: "Mode Démo", description: "La sauvegarde est désactivée en mode démo." });
+        router.push(`/dashboard/anomalies/${id}`);
+        return;
+    }
     setIsSubmitting(true)
     try {
       const docRef = doc(db, "chassesAuxAnomalies", id);
@@ -210,6 +240,16 @@ export default function EditChasseAuxAnomaliesPage() {
             </p>
         </div>
       </div>
+
+       {isDemoMode && (
+          <Alert variant="default" className="bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            <AlertTitle className="text-yellow-800 dark:text-yellow-300">Mode Démonstration</AlertTitle>
+            <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+              Vous êtes en mode démo. Les modifications ne seront pas sauvegardées.
+            </AlertDescription>
+          </Alert>
+      )}
       
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -392,8 +432,8 @@ export default function EditChasseAuxAnomaliesPage() {
           </Card>
 
           <div className="flex justify-end gap-4">
-            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-               {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting && !isDemoMode}>
+               {isSubmitting && !isDemoMode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Enregistrer les modifications
             </Button>
           </div>

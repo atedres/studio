@@ -21,13 +21,14 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, ArrowLeft, Loader2, X } from "lucide-react"
+import { Calendar as CalendarIcon, ArrowLeft, Loader2, X, AlertTriangle } from "lucide-react"
 import { db, storage } from "@/lib/firebase"
 import { doc, getDoc, updateDoc, Timestamp, collection, getDocs } from "firebase/firestore"
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage"
 import { logActivity } from '@/lib/activityLogger'
 import { Badge } from '@/components/ui/badge'
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const reunionSchema = z.object({
   nature: z.enum(["presentielle", "distancielle"], { required_error: "La nature de la réunion est requise." }),
@@ -48,13 +49,27 @@ type ReunionFormValues = z.infer<typeof reunionSchema>
 
 const durations = ["15 minutes", "30 minutes", "45 minutes", "60 minutes", "90 minutes", "120 minutes"];
 
+const demoReunion: ReunionFormValues = {
+    nature: 'presentielle',
+    source: 'Réunion mensuelle',
+    objet: 'Revue de la performance sécurité de Mai',
+    date: new Date(),
+    heure: '10:00',
+    lieu: 'Salle de conférence principale',
+    animateur: 'Y. Alaoui (Démo)',
+    duree: '90 minutes',
+    collaborateurs: 'A. Saidi, F. Ziani, C. Petit',
+    status: 'Planifiée',
+    compteRendu: 'Le compte rendu sera disponible après la réunion.',
+    support: undefined
+};
 
 export default function EditReunionPage() {
   const { toast } = useToast()
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
-  const { user } = useAuth();
+  const { user, isDemoMode } = useAuth();
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -86,10 +101,20 @@ export default function EditReunionPage() {
             setLoadingLists(false);
         }
     };
-    fetchUsers();
-  }, [toast]);
+    if (!isDemoMode) {
+        fetchUsers();
+    } else {
+        setLoadingLists(false);
+    }
+  }, [toast, isDemoMode]);
 
   useEffect(() => {
+    if (isDemoMode) {
+        form.reset(demoReunion);
+        setExistingSupportUrl('#');
+        setLoading(false);
+        return;
+    }
     if (!id) return;
 
     const fetchAndSetReunion = async () => {
@@ -120,7 +145,7 @@ export default function EditReunionPage() {
     };
 
     fetchAndSetReunion();
-  }, [id, form, router, toast]);
+  }, [id, form, router, toast, isDemoMode]);
 
   const handleParticipantInputChange = (newValue: string) => {
     const selectedSuggestion = userNames.find(name => name === newValue);
@@ -145,6 +170,11 @@ export default function EditReunionPage() {
 
 
   async function onSubmit(data: ReunionFormValues) {
+    if (isDemoMode) {
+        toast({ title: "Mode Démo", description: "La sauvegarde est désactivée en mode démo." });
+        router.push(`/dashboard/reunions/${id}`);
+        return;
+    }
     setIsSubmitting(true)
     
     let supportUrl = existingSupportUrl || 'Aucun fichier';
@@ -231,6 +261,16 @@ export default function EditReunionPage() {
             </p>
         </div>
       </div>
+
+        {isDemoMode && (
+          <Alert variant="default" className="bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            <AlertTitle className="text-yellow-800 dark:text-yellow-300">Mode Démonstration</AlertTitle>
+            <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+              Vous êtes en mode démo. Les modifications ne seront pas sauvegardées.
+            </AlertDescription>
+          </Alert>
+      )}
       
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -395,8 +435,8 @@ export default function EditReunionPage() {
           </Card>
 
           <div className="flex justify-end">
-            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting && !isDemoMode}>
+              {isSubmitting && !isDemoMode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Enregistrer les modifications
             </Button>
           </div>

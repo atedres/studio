@@ -59,12 +59,31 @@ interface DSDetails {
     demandeCorrectionCommentaire?: string;
 }
 
+const demoDS: DSDetails = {
+    id: 'demo-ds-1',
+    date: Timestamp.now(),
+    observateur: 'A. Saidi (Démo)',
+    activite: 'Conduite de chariot élévateur',
+    zone: 'Logistique',
+    poste: 'Allée centrale',
+    nombrePersonnes: 1,
+    identification: 'M. Tazi',
+    comportementsPositifs: [{ value: 'Port des EPI conforme' }, { value: "Maintien de l'ordre et de la propreté (5S)" }],
+    anomalies: [
+        { type: 'AD', description: 'Vitesse excessive dans les virages.', familleRisque: 'Risque routier', actionsImmediates: "Rappel à l'ordre verbal de l'opérateur.", responsable: 'A. Saidi', garant: 'L. Bennani', statut: 'Réalisée' },
+    ],
+    commentaires: "L'opérateur a été réceptif et a reconnu son erreur. Un rappel général sera fait à l'équipe.",
+    status: 'Validé',
+    validePar: 'F. Ziani (Démo)',
+    dateValidation: Timestamp.fromDate(new Date()),
+};
+
 export default function DialogueSecuriteDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
     const { toast } = useToast();
-    const { user } = useAuth();
+    const { user, isDemoMode } = useAuth();
 
     const [ds, setDs] = useState<DSDetails | null>(null);
     const [loading, setLoading] = useState(true);
@@ -73,6 +92,11 @@ export default function DialogueSecuriteDetailPage() {
     const canManage = user && ['niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
 
     useEffect(() => {
+        if (isDemoMode) {
+            setDs(demoDS);
+            setLoading(false);
+            return;
+        }
         if (!id) return;
 
         const fetchDS = async () => {
@@ -89,9 +113,14 @@ export default function DialogueSecuriteDetailPage() {
         };
 
         fetchDS();
-    }, [id]);
+    }, [id, isDemoMode]);
 
     const handleDelete = async () => {
+        if (isDemoMode) {
+            toast({ title: "Mode Démo", description: "La suppression est désactivée en mode démo." });
+            router.push('/dashboard/audits');
+            return;
+        }
         setIsDeleting(true);
         try {
             const docRef = doc(db, 'dialoguesSecurite', id);

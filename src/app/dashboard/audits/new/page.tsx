@@ -19,12 +19,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from '@/hooks/use-auth'
 import { format } from "date-fns"
-import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, Check, MessageCircle, Wand2, RefreshCcw, Undo2 } from "lucide-react"
+import { Calendar as CalendarIcon, PlusCircle, Trash2, ArrowLeft, Loader2, Check, MessageCircle, Wand2, RefreshCcw, Undo2, AlertTriangle } from "lucide-react"
 import { db } from "@/lib/firebase"
 import { collection, addDoc, serverTimestamp, getDocs, query, where } from "firebase/firestore"
 import { AutocompleteInput } from '@/components/ui/autocomplete-input'
 import { logActivity } from '@/lib/activityLogger'
 import { rewriteDescription } from '@/ai/flows/description-rewriter-flow'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 const dialogueSecuriteSchema = z.object({
   date: z.date({ required_error: "La date est requise." }),
@@ -110,7 +111,7 @@ interface FamilleRisque { id: string; nom: string; types?: string[]; }
 
 export default function NewDialogueSecuritePage() {
   const { toast } = useToast()
-  const { user } = useAuth()
+  const { user, isDemoMode } = useAuth()
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [submissionSuccess, setSubmissionSuccess] = React.useState(false);
@@ -181,9 +182,12 @@ export default function NewDialogueSecuritePage() {
             setLoadingLists(false);
         }
     };
-
-    fetchLists();
-  }, [toast]);
+    if (!isDemoMode) {
+      fetchLists();
+    } else {
+      setLoadingLists(false);
+    }
+  }, [toast, isDemoMode]);
   
   const selectedZoneName = form.watch('zone');
 
@@ -248,6 +252,10 @@ export default function NewDialogueSecuritePage() {
   };
 
   async function onSubmit(data: DialogueSecuriteFormValues) {
+    if (isDemoMode) {
+      toast({ title: "Mode Démo", description: "La soumission est désactivée en mode démo." });
+      return;
+    }
     if (!user) {
         toast({
             variant: "destructive",
@@ -284,6 +292,10 @@ export default function NewDialogueSecuritePage() {
   }
 
   async function onSaveDraft() {
+    if (isDemoMode) {
+      toast({ title: "Mode Démo", description: "La sauvegarde est désactivée en mode démo." });
+      return;
+    }
     if (!user) {
         toast({
             variant: "destructive",
@@ -372,6 +384,16 @@ export default function NewDialogueSecuritePage() {
             </p>
         </div>
       </div>
+
+      {isDemoMode && (
+          <Alert variant="default" className="bg-yellow-100 border-yellow-300 dark:bg-yellow-900/30 dark:border-yellow-700">
+            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+            <AlertTitle className="text-yellow-800 dark:text-yellow-300">Mode Démonstration</AlertTitle>
+            <AlertDescription className="text-yellow-700 dark:text-yellow-400">
+              Vous êtes en mode démo. Les formulaires ne peuvent pas être soumis ou sauvegardés.
+            </AlertDescription>
+          </Alert>
+      )}
       
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -662,12 +684,12 @@ export default function NewDialogueSecuritePage() {
           </Card>
 
           <div className="flex justify-end gap-4">
-            <Button type="button" variant="secondary" onClick={onSaveDraft} disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="button" variant="secondary" onClick={onSaveDraft} disabled={isSubmitting || isDemoMode}>
+              {isSubmitting && !isDemoMode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Enregistrer le brouillon
             </Button>
-            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSubmitting || isDemoMode}>
+              {isSubmitting && !isDemoMode && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Soumettre pour validation
             </Button>
           </div>

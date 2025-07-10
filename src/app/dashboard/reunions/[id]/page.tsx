@@ -49,13 +49,28 @@ interface ReunionDetails {
   compteRendu?: string;
 }
 
+const demoReunion: ReunionDetails = {
+    id: 'demo-reunion-1',
+    nature: 'presentielle',
+    source: 'Réunion mensuelle',
+    objet: 'Revue de la performance sécurité de Mai',
+    date: Timestamp.now(),
+    heure: '10:00',
+    lieu: 'Salle de conférence principale',
+    animateur: 'Y. Alaoui (Démo)',
+    duree: '90 minutes',
+    collaborateurs: 'A. Saidi, F. Ziani, C. Petit',
+    supportUrl: '#',
+    status: 'Planifiée',
+    compteRendu: 'Le compte rendu sera disponible après la réunion.'
+};
 
 export default function ReunionDetailPage() {
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
     const { toast } = useToast();
-    const { user } = useAuth();
+    const { user, isDemoMode } = useAuth();
 
     const [reunion, setReunion] = useState<ReunionDetails | null>(null);
     const [loading, setLoading] = useState(true);
@@ -65,6 +80,11 @@ export default function ReunionDetailPage() {
     const canManage = user && ['niveau2', 'niveau3', 'niveau4', 'niveau5', 'admin'].includes(user.role);
 
     useEffect(() => {
+        if (isDemoMode) {
+            setReunion(demoReunion);
+            setLoading(false);
+            return;
+        }
         if (!id) return;
 
         const fetchReunion = async () => {
@@ -101,9 +121,14 @@ L'équipe HSE SOMASTEEL`;
         };
 
         fetchReunion();
-    }, [id]);
+    }, [id, isDemoMode]);
 
     const handleDelete = async () => {
+        if (isDemoMode) {
+            toast({ title: "Mode Démo", description: "La suppression est désactivée en mode démo." });
+            router.push('/dashboard/reunions');
+            return;
+        }
         if (!reunion) return;
         setIsDeleting(true);
         try {
@@ -302,7 +327,7 @@ L'équipe HSE SOMASTEEL`;
                             <CardTitle className="flex items-center gap-2"><FileDown className="h-5 w-5" /> Support de Réunion</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {reunion.supportUrl && reunion.supportUrl !== 'Aucun fichier' ? (
+                            {reunion.supportUrl && reunion.supportUrl !== 'Aucun fichier' && reunion.supportUrl !== '#' ? (
                                 <Button asChild className="w-full">
                                     <a href={reunion.supportUrl} target="_blank" rel="noopener noreferrer">
                                         Télécharger le support
