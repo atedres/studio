@@ -190,7 +190,6 @@ export default function ActionPlanPage() {
     }
 
     const getLinkHref = (action: Action) => {
-        if (isDemoMode) return "#";
         return action.source === 'CAA' ? `/dashboard/anomalies/${action.sourceId}` : `/dashboard/audits/${action.sourceId}`;
     }
 
