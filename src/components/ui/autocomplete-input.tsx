@@ -1,3 +1,4 @@
+
 "use client"
 
 import React, { useState, useEffect, useRef } from "react";
@@ -17,9 +18,11 @@ export function AutocompleteInput({ value, onChange, suggestions, placeholder, c
     const [isOpen, setIsOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const filteredSuggestions = value.length > 0
+    const safeValue = value || "";
+
+    const filteredSuggestions = safeValue.length > 0
         ? suggestions.filter(suggestion =>
-            suggestion.toLowerCase().includes(value.toLowerCase())
+            suggestion.toLowerCase().includes(safeValue.toLowerCase())
           ).slice(0, 5)
         : [];
 
@@ -44,7 +47,7 @@ export function AutocompleteInput({ value, onChange, suggestions, placeholder, c
         <div className={cn("relative", className)} ref={containerRef}>
             <Input
                 type="text"
-                value={value || ''}
+                value={safeValue}
                 onChange={(e) => {
                     onChange(e.target.value);
                     if (e.target.value.length > 0) {
@@ -54,7 +57,7 @@ export function AutocompleteInput({ value, onChange, suggestions, placeholder, c
                     }
                 }}
                 onFocus={() => {
-                    if (value.length > 0 && filteredSuggestions.length > 0) {
+                    if (safeValue.length > 0 && filteredSuggestions.length > 0) {
                         setIsOpen(true);
                     }
                 }}
