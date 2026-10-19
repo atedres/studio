@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect } from 'react'
@@ -27,6 +26,8 @@ import { logActivity } from '@/lib/activityLogger'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { rewriteDescription } from '@/ai/flows/description-rewriter-flow'
 import { Badge } from '@/components/ui/badge'
+import { errorEmitter } from '@/firebase/error-emitter'
+import { FirestorePermissionError } from '@/firebase/errors'
 
 
 const chasseAuxAnomaliesSchema = z.object({
@@ -116,8 +117,6 @@ export default function NewChasseAuxAnomaliesPage() {
         }));
         form.setValue(fieldId as any, rewrittenText, { shouldValidate: true });
     } catch (error) {
-        console.error("Rewrite error:", error);
-        toast({ variant: "destructive", title: "Erreur IA", description: "La reformulation a échoué." });
         setAiRewriteStates(prev => ({ ...prev, [fieldId]: { ...prev[fieldId], isRewriting: false } }));
     }
   };
@@ -135,7 +134,7 @@ export default function NewChasseAuxAnomaliesPage() {
       if (originalText) {
           form.setValue(fieldId as any, originalText, { shouldValidate: true });
       }
-      acceptSuggestion(fieldId); // This just clears the state
+      acceptSuggestion(fieldId);
   };
 
 
@@ -224,7 +223,6 @@ export default function NewChasseAuxAnomaliesPage() {
             ]);
 
         } catch (error) {
-            console.error("Error fetching lists: ", error);
             toast({
                 variant: "destructive",
                 title: "Erreur de chargement",
@@ -284,27 +282,32 @@ export default function NewChasseAuxAnomaliesPage() {
         return
     }
     setIsSubmitting(true)
-    try {
-      const newDocRef = await addDoc(collection(db, "chassesAuxAnomalies"), {
+    const collectionRef = collection(db, "chassesAuxAnomalies");
+    const requestData = {
         ...data,
         createdBy: user.uid,
         userEmail: user.email,
         createdAt: serverTimestamp(),
-        status: "Ouverte", // Initial status
+        status: "Ouverte",
+    };
+
+    try {
+      addDoc(collectionRef, requestData).then(async (newDocRef) => {
+        await logActivity(user, "Création d'une Chasse aux Anomalies", { docId: newDocRef.id });
+        toast({
+            title: "Formulaire Soumis",
+            description: "La Chasse Aux Anomalies (CAA) a été enregistrée.",
+        })
+        router.push('/dashboard/anomalies')
+      }).catch(async (error) => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({
+              path: collectionRef.path,
+              operation: 'create',
+              requestResourceData: requestData
+          }));
       });
-      await logActivity(user, "Création d'une Chasse aux Anomalies", { docId: newDocRef.id });
-      toast({
-        title: "Formulaire Soumis",
-        description: "La Chasse Aux Anomalies (CAA) a été enregistrée.",
-      })
-      router.push('/dashboard/anomalies')
     } catch (error) {
-      console.error("Error adding document: ", error)
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible d'enregistrer le formulaire. Veuillez réessayer.",
-      })
+        // Handled centrally
     } finally {
         setIsSubmitting(false)
     }
@@ -325,27 +328,32 @@ export default function NewChasseAuxAnomaliesPage() {
     }
     setIsSubmitting(true)
     const data = form.getValues();
-    try {
-      const newDocRef = await addDoc(collection(db, "chassesAuxAnomalies"), {
+    const collectionRef = collection(db, "chassesAuxAnomalies");
+    const requestData = {
         ...data,
         status: "Brouillon",
         createdBy: user.uid,
         userEmail: user.email,
         createdAt: serverTimestamp(),
+    };
+
+    try {
+      addDoc(collectionRef, requestData).then(async (newDocRef) => {
+        await logActivity(user, "Enregistrement d'un brouillon de CAA", { docId: newDocRef.id });
+        toast({
+            title: "Brouillon Enregistré",
+            description: "La CAA a été sauvegardée en tant que brouillon.",
+        })
+        router.push('/dashboard/anomalies')
+      }).catch(async (error) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({
+            path: collectionRef.path,
+            operation: 'create',
+            requestResourceData: requestData
+        }));
       });
-      await logActivity(user, "Enregistrement d'un brouillon de CAA", { docId: newDocRef.id });
-      toast({
-        title: "Brouillon Enregistré",
-        description: "La CAA a été sauvegardée en tant que brouillon.",
-      })
-      router.push('/dashboard/anomalies')
     } catch (error) {
-      console.error("Error saving draft: ", error)
-      toast({
-        variant: "destructive",
-        title: "Erreur",
-        description: "Impossible d'enregistrer le brouillon. Veuillez réessayer.",
-      })
+        // Handled centrally
     } finally {
         setIsSubmitting(false)
     }

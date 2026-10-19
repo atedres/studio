@@ -1,4 +1,3 @@
-
 "use client"
 
 import React, { useState, useEffect, useMemo, useCallback } from "react"
@@ -22,6 +21,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
+import { errorEmitter } from '@/firebase/error-emitter'
+import { FirestorePermissionError } from '@/firebase/errors'
 
 type SubmissionStatus = "En attente de validation" | "À corriger" | "Validé" | "Rejeté" | "Ouverte" | "Clôturée" | "Brouillon";
 type SubmissionType = "Dialogue Sécurité" | "Chasse aux Anomalies";
@@ -74,7 +75,22 @@ export default function SubmissionsPage() {
                 : query(caaBaseQuery, where("zone", "==", user.entity), orderBy("createdAt", "desc"));
 
             
-            const [dsSnapshot, caaSnapshot] = await Promise.all([getDocs(dsQuery), getDocs(caaQuery)]);
+            const [dsSnapshot, caaSnapshot] = await Promise.all([
+                getDocs(dsQuery).catch(async (error) => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: dsBaseQuery.path,
+                        operation: 'list'
+                    }));
+                    throw error;
+                }),
+                getDocs(caaQuery).catch(async (error) => {
+                    errorEmitter.emit('permission-error', new FirestorePermissionError({
+                        path: caaBaseQuery.path,
+                        operation: 'list'
+                    }));
+                    throw error;
+                })
+            ]);
 
             const allSubmissions: Submission[] = [];
 
@@ -95,8 +111,6 @@ export default function SubmissionsPage() {
 
             caaSnapshot.docs.forEach(doc => {
                 const data = doc.data();
-                // CAA have a simpler status system, we can map it to our unified one
-                // For this page, we'll consider "Ouverte" as "En attente de validation"
                 let mappedStatus: SubmissionStatus = data.status;
                 if (data.status === 'Ouverte') mappedStatus = 'En attente de validation';
                 else if (data.status === 'Clôturée') mappedStatus = 'Validé';
@@ -114,17 +128,16 @@ export default function SubmissionsPage() {
                 }
             });
 
-            allSubmissions.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
+            allSubmissions.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
 
             setSubmissions(allSubmissions);
 
         } catch (error) {
-            console.error("Error fetching submissions: ", error);
-            toast({ variant: "destructive", title: "Erreur", description: "Impossible de charger les soumissions." });
+            // Error is handled contextually by the listener if it's a permission error
         } finally {
             setLoading(false);
         }
-    }, [user, toast]);
+    }, [user]);
 
     useEffect(() => {
         fetchSubmissions();
@@ -175,14 +188,19 @@ export default function SubmissionsPage() {
                 details.commentaire = correctionComment;
             }
 
-            await updateDoc(docRef, updateData);
+            updateDoc(docRef, updateData).catch(async (error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'update',
+                    requestResourceData: updateData
+                }));
+            });
             await logActivity(user, actionString, details);
 
-            fetchSubmissions(); // Refresh list
+            fetchSubmissions();
             toast({ title: toastTitle });
         } catch (error) {
-            console.error(`Error ${action} document: `, error);
-            toast({ variant: "destructive", title: "Erreur", description: "Une erreur est survenue." });
+             // Handled centrally
         } finally {
             setIsSubmitting(false);
             setIsRejectDialogOpen(false); setRejectionReason("");
@@ -200,18 +218,25 @@ export default function SubmissionsPage() {
         const finalStatus = isDS ? 'Validé' : 'Clôturée';
 
         const docRef = doc(db, collectionName, submission.id);
+        const updateData = { 
+            status: finalStatus,
+            validePar: user.displayName || user.email,
+            dateValidation: serverTimestamp(),
+        };
+
         try {
-            await updateDoc(docRef, { 
-                status: finalStatus,
-                validePar: user.displayName || user.email,
-                dateValidation: serverTimestamp(),
+            updateDoc(docRef, updateData).catch(async (error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: docRef.path,
+                    operation: 'update',
+                    requestResourceData: updateData
+                }));
             });
             await logActivity(user, `Validation de ${submission.type}`, { docId: submission.id });
             toast({ title: `${submission.type} validé(e)` });
-            fetchSubmissions(); // Refresh list
+            fetchSubmissions();
         } catch (error) {
-            console.error("Error validating document: ", error);
-            toast({ variant: "destructive", title: "Erreur de validation" });
+             // Handled centrally
         } finally {
             setIsSubmitting(false);
         }
